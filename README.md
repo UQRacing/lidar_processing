@@ -10,7 +10,7 @@ Instead of a single `master` branch, there are two main branches. `master` store
 
 Each new feature should have it's own branch `feature/name_of_feature`, and should branch off `develop`. When a feature is complete, please merge it into `develop`.
 
-Pull requests must have been reviewed by at least one person before being completed. However, becasue this is organisation is a free account, this rule cannot be enforced.
+Pull requests must have been reviewed by at least one person before being completed. However, because this organisation is a free(?) account, this rule cannot be enforced.
 
 ## Dependencies
 ### pcl_ros
