@@ -8,13 +8,14 @@ find_package(catkin REQUIRED COMPONENTS
   tf2
 )
 
-catkin_package( DEPENDS
+catkin_package(DEPENDS
   roscpp
   pcl_ros
   pcl_conversions
   sensor_msgs
   tf2
   INCLUDE_DIRS include
+  LIBRARIES PCLWrapper
 )
 
 ###########
@@ -23,13 +24,17 @@ catkin_package( DEPENDS
 
 include_directories(
   include
-  ${roscpp_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
-  ${PCL_INCLUDE_DIRS}
 )
 
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+add_library(PCLWrapper STATIC src/PCLWrapper.cpp)
+
 add_executable(cloudFilterSample src/cloudFilter.cpp)
 target_link_libraries(cloudFilterSample ${catkin_LIBRARIES})
+
+# FIXME: delete me; this is for testing purposed
+add_executable(testing src/test.cpp)
+target_link_libraries(testing ${catkin_LIBRARIES} PCLWrapper)
