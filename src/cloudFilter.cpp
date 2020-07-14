@@ -1,4 +1,4 @@
-#include <cloudFilter.hpp>
+#include "lidar_cones_detection/cloudFilter.hpp"
 
 cloud_filter::cloud_filter(std::string topic, ros::NodeHandle nh, double voxelSize){
     // Assign class variables
@@ -10,7 +10,7 @@ cloud_filter::cloud_filter(std::string topic, ros::NodeHandle nh, double voxelSi
 void cloud_filter::cloud_cb(const sensor_msgs::PointCloud2::ConstPtr& msg)
 {
   // Container for original & filtered data
-  pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2; 
+  pcl::PCLPointCloud2::Ptr cloud(new pcl::PCLPointCloud2);
   pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
   pcl::PCLPointCloud2 cloud_filtered;
 
