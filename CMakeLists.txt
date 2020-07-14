@@ -26,7 +26,6 @@ include_directories(
   ${roscpp_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
-  ${catkin_INCLUDE_DIRS}
 )
 
 link_directories(${PCL_LIBRARY_DIRS})
