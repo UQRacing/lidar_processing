@@ -1,4 +1,8 @@
-/// this file is for testing purposes
+/**
+ * @author Caleb Aitken
+ * @brief this file is for testing purposes
+ */
+
 
 #include "lidar_cones_detection/PCLWrapper.hpp"
 

@@ -14,17 +14,20 @@
 
 // TODO:
 //  - documentation
-//  - implement conversion functions
 
 #ifndef LIDAR_CONES_DETECTION_PCLWRAPPER_H
 #define LIDAR_CONES_DETECTION_PCLWRAPPER_H
+
+#include <ros/ros.h>
 
 #include <sensor_msgs/PointCloud2.h>
 
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/PCLPointCloud2.h>
+#include <pcl/conversions.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl_ros/transforms.h>
 
 namespace uqr {
 
@@ -72,19 +75,21 @@ namespace uqr {
         ~PointCloud() = default;
 
     private:
-        pcl::PointCloud<pcl::PointXYZ> pclPointCloud;
-        bool pclPointCloudIsInitialised = false;
-
-        pcl::PCLPointCloud2 pclPointCloud2;
-        bool pclPointCloud2IsInitialised = false;
-
-        sensor_msgs::PointCloud2 sensorPointCloud2;
-        bool sensorPointCloud2IsInitialised = false;
-
-        void convert_to_pclPointCloud2();
-        void convert_to_sensorPointCLoud2();
-        void convert_to_pclPointCloud()
+        int type = 0;
+        pcl::PointCloud<pcl::PointXYZ>::Ptr pclPointCloud = nullptr;
+        pcl::PCLPointCloud2::Ptr pclPointCloud2 = nullptr;
+        sensor_msgs::PointCloud2::Ptr sensorPointCloud2 = nullptr;
     };
+
+    // TODO: these static functions
+    //      also figure out if they're meant to be static or inline??
+    //      and decide if they return a new cloud, or modify the existing cloud
+    //          OR take a pointer to a second cloud as another parameter and load the new cloud into that??
+    static void voxelise();
+    static void pass_through_filter();
+    static void radius_outlier_removal();
+    static void sac_segmentation();
+    static void extract_indices();
 };
 
 #endif //LIDAR_CONES_DETECTION_PCLWRAPPER_H
