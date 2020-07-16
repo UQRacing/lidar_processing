@@ -36,3 +36,6 @@
 
 # JetBrains
 .idea
+
+# Test Data Folder
+data

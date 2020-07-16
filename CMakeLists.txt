@@ -40,4 +40,4 @@ target_link_libraries(cloudFilterSample ${catkin_LIBRARIES})
 
 # FIXME: delete me; this is for testing purposed
 add_executable(testing src/test.cpp)
-target_link_libraries(testing ${catkin_LIBRARIES} PCLWrapper)
+target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper)
