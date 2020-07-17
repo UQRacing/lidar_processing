@@ -35,6 +35,7 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/filters/conditional_removal.h>
 
+
 namespace uqr {
 
     /**
@@ -45,7 +46,7 @@ namespace uqr {
     class PointCloud {
     public:
         /// empty PointCLoud constructor
-        PointCloud() = default;
+        PointCloud();
 
         /// copy constructor
         PointCloud(const PointCloud& otherPointCloud) = default;
@@ -69,16 +70,19 @@ namespace uqr {
         PointCloud(const pcl::PointCloud<pcl::PointXYZ>& otherPointCloud);
 
         /// implicit conversion to sensor_msgs::PointCloud2
-        operator sensor_msgs::PointCloud2();
+        operator sensor_msgs::PointCloud2() const;
 
         /// implicit conversion to pcl::PCLPointCloud2
-        operator pcl::PCLPointCloud2();
+        operator pcl::PCLPointCloud2() const;
 
         /// implicit conversion to pcl::PointCloud<pcl::PointXYZ>
-        operator pcl::PointCloud<pcl::PointXYZ>();
+        operator pcl::PointCloud<pcl::PointXYZ>() const;
 
         /// Destructor
         ~PointCloud() = default;
+
+        using Ptr = boost::shared_ptr<::uqr::PointCloud>;
+        using ConstPtr = boost::shared_ptr<const ::uqr::PointCloud>;
 
     private:
         int type = 0;
@@ -94,145 +98,22 @@ namespace uqr {
 
     //      For input/output stuff, I'm a fan of leaving the input as be and modiyfing an output pointer.
 
-    static void voxelise(PointCloud &inputCloud, PointCloud &outputCloud, const double voxel_size){
-        // Convert to PCLPointCloud2 Format
-        pcl::PCLPointCloud2 pc2InputCloud(inputCloud);
+    void voxelise(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud, const float voxel_size);
 
-        // Define input and output clouds for filtering
-        pcl::PCLPointCloud2::Ptr preFilter(new pcl::PCLPointCloud2);
-        pcl::PCLPointCloud2 cloud_filtered;
-        
-        // Copy across data
-        pcl::copyPointCloud(pc2InputCloud, *preFilter);
-
-        // Define Input
-        pcl::VoxelGrid<pcl::PCLPointCloud2> filter;
-        filter.setInputCloud(preFilter);
-
-        // Configure Parameters
-        filter.setLeafSize(voxel_size, voxel_size, voxel_size);
-        
-        // Filter
-        filter.filter(cloud_filtered);
-
-        // Assign to output pointer
-        outputCloud = cloud_filtered;
-    }
-
-    static void pass_through_filter(PointCloud &inputCloud, PointCloud &outputCloud,
-                                    const std::string  field_name, const double lower_limit,
-                                    const double upper_limit, const bool invert_filter){
-        // Convert to PCLPointCloud2 Format
-        pcl::PCLPointCloud2 pc2InputCloud(inputCloud);
-
-        // Define input and output clouds for filtering
-        pcl::PCLPointCloud2::Ptr preFilter(new pcl::PCLPointCloud2);
-        pcl::PCLPointCloud2 cloud_filtered;
-        
-        // Copy across data
-        pcl::copyPointCloud(pc2InputCloud, *preFilter);
-        
-        // Define Input
-        pcl::PassThrough<pcl::PCLPointCloud2> filter;
-        filter.setInputCloud(preFilter);
-
-        // Configure Parameters
-        filter.setFilterFieldName(field_name);
-        filter.setFilterLimits(lower_limit, upper_limit);
-        filter.setFilterLimitsNegative(invert_filter);
-
-        // Filter
-        filter.filter(cloud_filtered);
-
-        outputCloud = cloud_filtered;
-    }
+    void pass_through_filter(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud,
+                             const std::string&  field_name, const double lower_limit,
+                             const double upper_limit, const bool invert_filter);
     
-    static void radius_outlier_removal(PointCloud &inputCloud, PointCloud &outputCloud, 
-                                       const double radius, const double neighbours){
-        // Convert to PCLPointCloud2 Format
-        pcl::PCLPointCloud2 pc2InputCloud(inputCloud);
+    void radius_outlier_removal(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud,
+                                const double radius, const double neighbours);
 
-        // Define input and output clouds for filtering
-        pcl::PCLPointCloud2::Ptr preFilter(new pcl::PCLPointCloud2);
-        pcl::PCLPointCloud2 cloud_filtered;
-        
-        // Copy across data
-        pcl::copyPointCloud(pc2InputCloud, *preFilter);
-        
-        // Define Input
-        pcl::RadiusOutlierRemoval<pcl::PCLPointCloud2> filter;
-        filter.setInputCloud(preFilter);
+    void sac_segmentation(const uqr::PointCloud::ConstPtr& inputCloud, pcl::ModelCoefficients &outputCoeff, pcl::PointIndices &outputIndex,
+                          const int model, const int method, const double threshold, const bool optimize_coeff);
 
-        // Configure Parameters
-        filter.setRadiusSearch(radius);
-        filter.setMinNeighborsInRadius(neighbours);
+    void extract_indices();
 
-        // Filter
-        filter.filter(cloud_filtered);
-
-        outputCloud = cloud_filtered;
-    }
-
-    static void sac_segmentation(PointCloud &inputCloud, pcl::ModelCoefficients &outputCoeff, pcl::PointIndices &outputIndex,
-                                 const int model, const int method, const double threshold, const bool optimize_coeff){
-
-        // Method Types can be found at pcl/sample_consensus/method_types.h
-        // Model Types can be found at pcl/sample_consensus/model_types.h
-
-        // Convert to PCLPointCloud2 Format
-        pcl::PointCloud<pcl::PointXYZ> pclInputCloud(inputCloud);
-
-        // Define input clouds for filtering
-        pcl::PointCloud<pcl::PointXYZ>::Ptr preSegment(new pcl::PointCloud<pcl::PointXYZ>);
-
-        // Copy across data
-        pcl::copyPointCloud(pclInputCloud, *preSegment);
-        
-        // Define Input
-        pcl::SACSegmentation<pcl::PointXYZ> segment;
-        segment.setInputCloud(preSegment);
-
-        // Configure Parameters        
-        segment.setOptimizeCoefficients(optimize_coeff);
-        segment.setModelType(model);
-        segment.setMethodType(method);
-        segment.setDistanceThreshold(threshold);
-
-        // Segment
-        segment.segment(outputIndex, outputCoeff);
-    }
-
-    static void extract_indices();
-
-    static void conditional_filter( PointCloud &inputCloud, PointCloud &outputCloud, 
-                                    pcl::ConditionAnd<pcl::PointXYZ>::Ptr condition){
-        // Sample condition: 
-        // pcl::ConditionAnd<pcl::PointXYZ>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZ> ());
-        // range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::GT, 0.0)));
-        // range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::LT, 0.8)));
-
-        // Convert to PCL::PointCloud Format
-        pcl::PointCloud<pcl::PointXYZ> pclInputCloud(inputCloud);
-
-        // Define input and output clouds for filtering
-        pcl::PointCloud<pcl::PointXYZ>::Ptr preFilter(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ> cloud_filtered;
-        
-        // Copy across data
-        pcl::copyPointCloud(pclInputCloud, *preFilter);
-        
-        // Define Input
-        pcl::ConditionalRemoval<pcl::PointXYZ> filter;
-        filter.setInputCloud(preFilter);
-
-        // Configure Parameters
-        filter.setCondition(condition);
-
-        // Filter
-        filter.filter(cloud_filtered);
-
-        outputCloud = cloud_filtered;
-    }
+    void conditional_filter(const uqr::PointCloud::ConstPtr &inputCloud, uqr::PointCloud &outputCloud,
+                            pcl::ConditionAnd<pcl::PointXYZ>::Ptr condition);
 };
 
 #endif //LIDAR_CONES_DETECTION_PCLWRAPPER_H

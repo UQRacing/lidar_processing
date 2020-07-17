@@ -6,62 +6,75 @@
 
 #include "lidar_cones_detection/PCLWrapper.hpp"
 #include "pcl/io/pcd_io.h"
-#include "ros/ros.h"
 
-// Caleb Test Main Loop
-// int main(int argc, char** argv) {
-//     pcl::PCLPointCloud2::Ptr origin(new pcl::PCLPointCloud2());
-//     std::cout << "pcl::PCLPointCloud2::Ptr points to: " << origin << std::endl;
-//     uqr::PointCloud pointCloud(*origin);
-//     std::cout << "uqr::PointCloud points to: " << &pointCloud << std::endl;
-//     pcl::PCLPointCloud2 pclPointCloud = pointCloud;
-//     sensor_msgs::PointCloud2 sensorPointCloud = pointCloud;
-//     std::cout << "uqr::PointCloud points to: " << &pointCloud << std::endl;
-//     std::cout << "pcl::PCLPointCloud2 points to: " << &pclPointCloud << std::endl;
-//     std::cout << "sensor_msgs::PointCloud2 points to: " << &sensorPointCloud << std::endl;
-// }
+// sorry riley i didn't save your test loop somewhere before chucking all these tests in
 
-// Riley Test Main Loop
-int main(int argc, char** argv) {
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+class NodeWrapper {
+public:
+    /// constructor
+    explicit NodeWrapper();
 
-    if (pcl::io::loadPCDFile<pcl::PointXYZ> ("test_pcd.pcd", *cloud) == -1) //* load the file
-    {
-        PCL_ERROR ("Couldn't read file test_pcd.pcd \n");
-        return (-1);
-    }
-    std::cout << "Loaded "
-                << cloud->width * cloud->height
-                << " data points from test_pcd.pcd with the following fields: "
-                << std::endl;
+    /// default destructor
+    ~NodeWrapper() = default;
 
-    uqr::PointCloud pointCloud(*cloud);
-    uqr::PointCloud pointCloudOut;
-    uqr::voxelise(pointCloud, pointCloudOut, 0.5);
-    
-    sensor_msgs::PointCloud2 inputCloud = pointCloud;
-    sensor_msgs::PointCloud2 outputCloud = pointCloudOut;
+    /// deleted copy constructor
+    NodeWrapper(const NodeWrapper&) = delete;
 
-    ros::init (argc, argv, "pub_pcl");
-    ros::NodeHandle nh;
-    ros::Publisher inputPub = nh.advertise<sensor_msgs::PointCloud2> ("input_cloud", 1);
-    ros::Publisher outputPub = nh.advertise<sensor_msgs::PointCloud2> ("output_cloud", 1);
+    /// deleted copy operator
+    NodeWrapper& operator=(NodeWrapper&) = delete;
+
+    /**
+     * Handle data published by lidar
+     *
+     * @param scan sensor_msgs::PointCloud2 published by the lidar
+     */
+    void lidarReadCallback(const sensor_msgs::PointCloud2::ConstPtr& scan);
+
+private:
+    // ros node handle
+    ros::NodeHandle node;
+
+    // ros subscriber; subs to lidar data output
+    ros::Subscriber lidarReadSub;
+    ros::Publisher out;
+};
+
+/**
+ * Set up subscriber
+ */
+NodeWrapper::NodeWrapper() {
+    this->lidarReadSub = this->node.subscribe<sensor_msgs::PointCloud2>("velodyne_points", 100, &NodeWrapper::lidarReadCallback, this);
+    this->out = node.advertise<sensor_msgs::PointCloud2>("output_cloud", 100);
+}
+
+/**
+ * Handle data published by lidar
+ *
+ * @param scan sensor_msgs::PointCloud2 published by the lidar
+ */
+void NodeWrapper::lidarReadCallback(const sensor_msgs::PointCloud2::ConstPtr& scan) {
+    uqr::PointCloud::Ptr pointCloud(new uqr::PointCloud(*scan));
+    uqr::PointCloud::Ptr pointCloudOut(new uqr::PointCloud);
+    uqr::voxelise(pointCloud, *pointCloudOut, 0.5);
+
+    sensor_msgs::PointCloud2 inputCloud = *pointCloud;
+    sensor_msgs::PointCloud2 outputCloud = *pointCloudOut;
 
     inputCloud.header.frame_id = "map";
     inputCloud.header.stamp = ros::Time::now();
     outputCloud.header.frame_id = "map";
     outputCloud.header.stamp = ros::Time::now();
 
-    ros::Rate loop_rate(4);
-    while (nh.ok())
-    {
-        inputCloud.header.frame_id = "map";
-        inputCloud.header.stamp = ros::Time::now();
-        outputCloud.header.frame_id = "map";
-        outputCloud.header.stamp = ros::Time::now();
-        inputPub.publish(inputCloud);
-        outputPub.publish(outputCloud);
-        ros::spinOnce ();
-        loop_rate.sleep ();
-    }
+    out.publish(outputCloud);
+
+    // simplest check for size change
+    // std::cout << inputCloud.height * inputCloud.width << std::endl;
+    // std::cout << outputCloud.height * outputCloud.width << std::endl;
+}
+
+int main(int argc, char** argv) {
+    ros::init(argc, argv, "lidar_cone");
+    NodeWrapper nodeWarpper;
+    ros::spin();
+    return 0;
 }
