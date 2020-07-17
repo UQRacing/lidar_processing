@@ -34,7 +34,7 @@
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/filters/conditional_removal.h>
-
+#include <pcl/filters/extract_indices.h>
 
 namespace uqr {
 
@@ -110,7 +110,7 @@ namespace uqr {
     void sac_segmentation(const uqr::PointCloud::ConstPtr& inputCloud, pcl::ModelCoefficients &outputCoeff, pcl::PointIndices &outputIndex,
                           const int model, const int method, const double threshold, const bool optimize_coeff);
 
-    void extract_indices();
+    void subtract_indices(const uqr::PointCLoud::ConstPtr& inputCloud, uqr::PointCLoud& outputCloud, const pcl::PointIndices::Ptr& subtraction);
 
     void conditional_filter(const uqr::PointCloud::ConstPtr &inputCloud, uqr::PointCloud &outputCloud,
                             pcl::ConditionAnd<pcl::PointXYZ>::Ptr condition);
