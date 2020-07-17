@@ -228,9 +228,9 @@ void uqr::sac_segmentation(const uqr::PointCloud::ConstPtr& inputCloud, pcl::Mod
     segment.segment(outputIndex, outputCoeff);
 }
 
-void uqr::subtract_indices(const uqr::PointCLoud::ConstPtr& inputCloud, uqr::PointCLoud& outputCloud, const pcl::PointIndices::Ptr& subtraction) {
-    pcl::ExtractIndicies<pcl::PointXYZ> extract;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr preSubtraction(new pcl::PointCloud<pcl::PointXYZ>((pcl::PointCloud<pcl::PointXYZ>) *inputCloud)));
+void uqr::subtract_indices(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud, const pcl::PointIndices::Ptr& subtraction) {
+    pcl::ExtractIndices<pcl::PointXYZ> extract;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr preSubtraction(new pcl::PointCloud<pcl::PointXYZ>((pcl::PointCloud<pcl::PointXYZ>) *inputCloud));
     pcl::PointCloud<pcl::PointXYZ> cloudSubtracted;
     
     extract.setInputCloud(preSubtraction);
