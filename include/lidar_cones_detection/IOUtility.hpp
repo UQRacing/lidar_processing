@@ -67,9 +67,32 @@ namespace uqr {
             cloudPublisher(std::string topic, std::string frame);
             
             // Publish Methods
+            /**
+             * Publish a uqr::PointCloud
+             *
+             * @param cloud The cloud to be published.
+             */
             void publish(PointCloud& cloud);
+
+            /**
+             * Publish a sensor_msgs::PointCloud2
+             *
+             * @param cloud The cloud to be published.
+             */
             void publish(sensor_msgs::PointCloud2& cloud);
+
+            /**
+             * Publish a pcl::PCLPointCloud2
+             *
+             * @param cloud The cloud to be published.
+             */
             void publish(pcl::PCLPointCloud2& cloud);
+
+            /**
+             * Publish a pcl::PointCloud<pcl::PointXYZ>
+             *
+             * @param cloud The cloud to be published.
+             */
             void publish(pcl::PointCloud<pcl::PointXYZ>& cloud);
 
             /// Destructor
