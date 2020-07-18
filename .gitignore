@@ -33,3 +33,9 @@
 
 # VSCode
 .vscode
+
+# JetBrains
+.idea
+
+# Test Data Folder
+data
