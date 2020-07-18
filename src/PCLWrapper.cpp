@@ -7,131 +7,135 @@
 
 #include "lidar_cones_detection/PCLWrapper.hpp"
 
-// TODO: GOD DAMN BRUH this code is wack. WHAT DOES IT MEAn?
-//      maybe?,.., explain it with comments????
-
-// TODO: haha i haven't tested any of this yet :)
-//      at the least, it runs without crashing
-
+// Empty Class Constructor
 uqr::PointCloud::PointCloud() {
     this->pclPointCloud2.reset(new pcl::PCLPointCloud2);
     this->pclPointCloud.reset(new pcl::PointCloud<pcl::PointXYZ>);
     this->sensorPointCloud2.reset(new sensor_msgs::PointCloud2);
 }
 
+// Sensor Messaages Class Constructor
 uqr::PointCloud::PointCloud(const sensor_msgs::PointCloud2& otherPointCloud) {
+    // Reset All Clouds and Assign Input to Corresponding Type
     this->pclPointCloud.reset();
     this->pclPointCloud2.reset();
     this->sensorPointCloud2 = boost::make_shared<sensor_msgs::PointCloud2>(sensor_msgs::PointCloud2(otherPointCloud));
-    this->type = 1;
+    this->currentType = storedCloud::SENSOR_MSGS;
 }
 
 uqr::PointCloud::PointCloud(const pcl::PCLPointCloud2& otherPointCloud) {
+    // Reset All Clouds and Assign Input to Corresponding Type
     this->pclPointCloud.reset();
     this->sensorPointCloud2.reset();
     this->pclPointCloud2 = boost::make_shared<pcl::PCLPointCloud2>(pcl::PCLPointCloud2(otherPointCloud));
-    this->type = 2;
+    this->currentType = storedCloud::PCL_PC2;
 }
 
 uqr::PointCloud::PointCloud(const pcl::PointCloud<pcl::PointXYZ>& otherPointCloud) {
+    // Reset All Clouds and Assign Input to Corresponding Type
     this->sensorPointCloud2.reset();
     this->pclPointCloud2.reset();
     this->pclPointCloud = boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(pcl::PointCloud<pcl::PointXYZ>(otherPointCloud));
-    this->type = 3;
+    this->currentType = storedCloud::PCL_PXYZ;
 }
 
-// if you, the reader, are wondering "why did this man put braces on a switch case statement"
-// I dare you to remove them and try compiling this code
+// Conversion to sensor_msgs::PointCloud2
 uqr::PointCloud::operator sensor_msgs::PointCloud2() const {
-    switch (this->type) {
-        case 0: {
+    switch (this->currentType) {
+        case storedCloud::NO_CLOUD: {
+            // None --> sensor_msgs::PointCloud2
             return sensor_msgs::PointCloud2();
-        } case 1: {
-            // from sensor_msgs::PointCloud2
+
+        } case storedCloud::SENSOR_MSGS: {
+            // sensor_msgs::PointCloud2 --> sensor_msgs::PointCloud2
             return sensor_msgs::PointCloud2(*this->sensorPointCloud2);
-        } case 2: {
-            // from pcl::PCLPointCloud2
+
+        } case storedCloud::PCL_PC2: {
+            // pcl::PCLPointCloud2 --> sensor_msgs::PointCloud2
             sensor_msgs::PointCloud2 rosCloud;
-            pcl::PointCloud<pcl::PointXYZ> betweenConversion;
-            pcl::fromPCLPointCloud2(*this->pclPointCloud2, betweenConversion);
-            pcl::toROSMsg(betweenConversion, rosCloud);
+            pcl_conversions::fromPCL(*this->pclPointCloud2, rosCloud);
             return rosCloud;
-        } case 3: {
-            // from pcl::PointCloud<pcl::PointXYZ>
+
+        } case storedCloud::PCL_PXYZ: {
+            // pcl::PointCloud<pcl::PointXYZ> --> sensor_msgs::PointCloud2
             sensor_msgs::PointCloud2 rosCloud;
             pcl::toROSMsg(*this->pclPointCloud, rosCloud);
             return rosCloud;
+
         } default: {
+            // Unkown Identifier
             throw std::out_of_range("uqr::PointCloud type identifier out of range");
         }
     }
 }
 
-// if you, the reader, are wondering "why did this man put braces on a switch case statement"
-// I dare you to remove them and try compiling this code
+// Conversion to pcl::PCLPointCloud2
 uqr::PointCloud::operator pcl::PCLPointCloud2() const {
-    switch (this->type) {
-        case 0: {
+    switch (this->currentType) {
+        case storedCloud::NO_CLOUD: {
+            // None --> pcl::PCLPointCloud2
             return pcl::PCLPointCloud2();
-        } case 1: {
-            // from sensor_msgs::PointCloud2
-            // TODO: why tf doesn't this convert straight to the other. they have the same name??
+
+        } case storedCloud::SENSOR_MSGS: {
+            // sensor_msgs::PointCloud2 --> pcl::PCLPointCloud2
             pcl::PCLPointCloud2 pclCloud;
-            pcl::PointCloud<pcl::PointXYZ> betweenConversion;
-            pcl::fromROSMsg(*this->sensorPointCloud2, betweenConversion);
-            pcl::toPCLPointCloud2(betweenConversion, pclCloud);
+            pcl_conversions::toPCL(*this->sensorPointCloud2,pclCloud);
             return pclCloud;
-        } case 2: {
-            // from pcl::PCLPointCloud2
+
+        } case storedCloud::PCL_PC2: {
+            // pcl::PCLPointCloud2 --> pcl::PCLPointCloud2
             return pcl::PCLPointCloud2(*this->pclPointCloud2);
-        } case 3: {
-            // from pcl::PointCloud<pcl::PointXYZ>
+
+        } case storedCloud::PCL_PXYZ: {
+            // pcl::PointCloud<pcl::PointXYZ> --> pcl::PCLPointCloud2
             pcl::PCLPointCloud2 pclCloud;
             pcl::toPCLPointCloud2(*this->pclPointCloud, pclCloud);
             return pclCloud;
+
         } default: {
+            // Unkown Identifier
             throw std::out_of_range("uqr::PointCloud type identifier out of range");
         }
     }
 }
 
-// if you, the reader, are wondering "why did this man put braces on a switch case statement"
-// I dare you to remove them and try compiling this code
+// Conversion to pcl::PointCloud<pcl::PointXYZ>
 uqr::PointCloud::operator pcl::PointCloud<pcl::PointXYZ>() const {
-    switch (this->type) {
-        case 0: {
+    switch (this->currentType) {
+        // None --> pcl::PointCloud<pcl::PointXYZ>
+        case storedCloud::NO_CLOUD: {
             return pcl::PointCloud<pcl::PointXYZ>();
-        } case 1: {
-            // from sensor_msgs::PointCloud2
+
+        } case storedCloud::SENSOR_MSGS: {
+            // sensor_msgs::PointCloud2 --> pcl::PointCloud<pcl::PointXYZ>
             pcl::PointCloud<pcl::PointXYZ> pclCloud;
             pcl::fromROSMsg(*this->sensorPointCloud2, pclCloud);
             return pclCloud;
-        } case 2: {
-            // from pcl::PCLPointCloud2
+
+        } case storedCloud::PCL_PC2: {
+            // pcl::PointCloud2 --> pcl::PointCloud<pcl::PointXYZ> 
             pcl::PointCloud<pcl::PointXYZ> pclCloud;
             pcl::fromPCLPointCloud2(*this->pclPointCloud2, pclCloud);
             return pclCloud;
-        } case 3: {
-            // from pcl::PointCloud<pcl::PointXYZ>
+
+        } case storedCloud::PCL_PXYZ: {
+            // pcl::PointCloud<pcl::PointXYZ> --> pcl::PointCloud<pcl::PointXYZ>
             return pcl::PointCloud<pcl::PointXYZ>(*this->pclPointCloud);
+
         } default: {
+            // Unkown Identifier
             throw std::out_of_range("uqr::PointCloud type identifier out of range");
         }
     }
 }
 
 void uqr::voxelise(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud, const float voxel_size) {
-    // Convert to PCLPointCloud2 Format
-    // pcl::PCLPointCloud2 pc2InputCloud(inputCloud);
 
     // Define input and output clouds for filtering
     pcl::PCLPointCloud2::Ptr preFilter(new pcl::PCLPointCloud2((pcl::PCLPointCloud2) *inputCloud));
     pcl::PCLPointCloud2 cloud_filtered;
 
-    // Copy across data
-    // pcl::copyPointCloud(pc2InputCloud, *preFilter);
-
-    // Define Input
+    // Configure Filter and Input
     pcl::VoxelGrid<pcl::PCLPointCloud2> filter;
     filter.setInputCloud(preFilter);
 
@@ -148,25 +152,20 @@ void uqr::voxelise(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud&
 
 void uqr::pass_through_filter(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud,
                               const std::string&  field_name, const double lower_limit,
-                              const double upper_limit, const bool invert_filter) {
-    // Convert to PCLPointCloud2 Format
-    //pcl::PCLPointCloud2 pc2InputCloud(inputCloud);
+                              const double upper_limit, const bool invert) {
 
     // Define input and output clouds for filtering
     pcl::PCLPointCloud2::Ptr preFilter(new pcl::PCLPointCloud2((pcl::PCLPointCloud2) *inputCloud));
     pcl::PCLPointCloud2 cloud_filtered;
 
-    // Copy across data
-    //pcl::copyPointCloud(pc2InputCloud, *preFilter);
-
-    // Define Input
+    // Configure Filter and Input
     pcl::PassThrough<pcl::PCLPointCloud2> filter;
     filter.setInputCloud(preFilter);
 
     // Configure Parameters
     filter.setFilterFieldName(field_name);
     filter.setFilterLimits(lower_limit, upper_limit);
-    filter.setFilterLimitsNegative(invert_filter);
+    filter.setFilterLimitsNegative(invert);
 
     // Filter
     filter.filter(cloud_filtered);
@@ -176,17 +175,12 @@ void uqr::pass_through_filter(const uqr::PointCloud::ConstPtr& inputCloud, uqr::
 
 void uqr::radius_outlier_removal(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud,
                                  const double radius, const double neighbours) {
-    // Convert to PCLPointCloud2 Format
-    //pcl::PCLPointCloud2 pc2InputCloud(inputCloud);
 
     // Define input and output clouds for filtering
     pcl::PCLPointCloud2::Ptr preFilter(new pcl::PCLPointCloud2((pcl::PCLPointCloud2) *inputCloud));
     pcl::PCLPointCloud2 cloud_filtered;
 
-    // Copy across data
-    //pcl::copyPointCloud(pc2InputCloud, *preFilter);
-
-    // Define Input
+    // Configure Filter and Input
     pcl::RadiusOutlierRemoval<pcl::PCLPointCloud2> filter;
     filter.setInputCloud(preFilter);
 
@@ -202,19 +196,11 @@ void uqr::radius_outlier_removal(const uqr::PointCloud::ConstPtr& inputCloud, uq
 
 void uqr::sac_segmentation(const uqr::PointCloud::ConstPtr& inputCloud, pcl::ModelCoefficients &outputCoeff, pcl::PointIndices &outputIndex,
                            const int model, const int method, const double threshold, const bool optimize_coeff) {
-    // Method Types can be found at pcl/sample_consensus/method_types.h
-    // Model Types can be found at pcl/sample_consensus/model_types.h
-
-    // Convert to PCLPointCloud2 Format
-    //pcl::PointCloud<pcl::PointXYZ> pclInputCloud(inputCloud);
 
     // Define input clouds for filtering
     pcl::PointCloud<pcl::PointXYZ>::Ptr preSegment(new pcl::PointCloud<pcl::PointXYZ>((pcl::PointCloud<pcl::PointXYZ>) *inputCloud));
 
-    // Copy across data
-    //pcl::copyPointCloud(pclInputCloud, *preSegment);
-
-    // Define Input
+    // Configure Segmenter and Input
     pcl::SACSegmentation<pcl::PointXYZ> segment;
     segment.setInputCloud(preSegment);
 
@@ -228,37 +214,35 @@ void uqr::sac_segmentation(const uqr::PointCloud::ConstPtr& inputCloud, pcl::Mod
     segment.segment(outputIndex, outputCoeff);
 }
 
-void uqr::subtract_indices(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud, const pcl::PointIndices::Ptr& subtraction) {
-    pcl::ExtractIndices<pcl::PointXYZ> extract;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr preSubtraction(new pcl::PointCloud<pcl::PointXYZ>((pcl::PointCloud<pcl::PointXYZ>) *inputCloud));
-    pcl::PointCloud<pcl::PointXYZ> cloudSubtracted;
-    
-    extract.setInputCloud(preSubtraction);
+void uqr::subtract_indices(const uqr::PointCloud::ConstPtr& inputCloud, uqr::PointCloud& outputCloud, const pcl::PointIndices::Ptr& subtraction, const bool invert) {
+
+    // Define input and output clouds for filtering
+    pcl::PCLPointCloud2::Ptr preFilter(new pcl::PCLPointCloud2((pcl::PCLPointCloud2) *inputCloud));
+    pcl::PCLPointCloud2 cloud_filtered;
+
+    // Configure Filter and Input
+    pcl::ExtractIndices<pcl::PCLPointCloud2> extract;
+    extract.setInputCloud(preFilter);
     extract.setIndices(subtraction);
-    extract.setNegative(true);
-    extract.filter(cloudSubtracted);
-    outputCloud = cloudSubtracted;
+
+    // Configure Parameters
+    extract.setNegative(invert);
+
+    // Filter
+    extract.filter(cloud_filtered);
+
+    outputCloud = cloud_filtered;
 }
 
 
 void uqr::conditional_filter(const uqr::PointCloud::ConstPtr &inputCloud, uqr::PointCloud &outputCloud,
                              pcl::ConditionAnd<pcl::PointXYZ>::Ptr condition) {
-    // Sample condition:
-    // pcl::ConditionAnd<pcl::PointXYZ>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZ> ());
-    // range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::GT, 0.0)));
-    // range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::LT, 0.8)));
-
-    // Convert to PCL::PointCloud Format
-    //pcl::PointCloud<pcl::PointXYZ> pclInputCloud(inputCloud);
-
+    
     // Define input and output clouds for filtering
     pcl::PointCloud<pcl::PointXYZ>::Ptr preFilter(new pcl::PointCloud<pcl::PointXYZ>((pcl::PointCloud<pcl::PointXYZ>) *inputCloud));
     pcl::PointCloud<pcl::PointXYZ> cloud_filtered;
 
-    // Copy across data
-    //pcl::copyPointCloud(pclInputCloud, *preFilter);
-
-    // Define Input
+    // Configure Segmenter and Input
     pcl::ConditionalRemoval<pcl::PointXYZ> filter;
     filter.setInputCloud(preFilter);
 
