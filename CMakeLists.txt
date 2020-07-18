@@ -35,9 +35,12 @@ include_directories(
 add_library(PCLWrapper STATIC src/PCLWrapper.cpp)
 target_link_libraries(PCLWrapper ${pcl_ros_LIBRARIES})
 
+add_library(IOUtility STATIC src/IOUtility.cpp)
+target_link_libraries(IOUtility ${pcl_ros_LIBRARIES} PCLWrapper)
+
 add_executable(cloudFilterSample src/cloudFilter.cpp)
 target_link_libraries(cloudFilterSample ${catkin_LIBRARIES})
 
 # FIXME: delete me; this is for testing purposed
 add_executable(testing src/test.cpp)
-target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper)
+target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
