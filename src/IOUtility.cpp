@@ -64,60 +64,49 @@ void uqr::write_cloud(const std::string file_path, uqr::PointCloud& input_cloud)
 uqr::cloudPublisher::cloudPublisher(std::string topic){
     // Initialise Publisher
     this->cloudPub = this->nh.advertise<sensor_msgs::PointCloud2>(topic, 10);
-    this->frame = "map"; // Default Frame
-
 }
 
-uqr::cloudPublisher::cloudPublisher(std::string topic, std::string frame){
-    // Initialise Publisher
-    this->cloudPub = this->nh.advertise<sensor_msgs::PointCloud2>(topic, 10);
-    this->frame = frame;
-}
-
-void uqr::cloudPublisher::publish(uqr::PointCloud& cloud){
+void uqr::cloudPublisher::publish(uqr::PointCloud& cloud, std::string frame, ros::Time timeStamp){
     sensor_msgs::PointCloud2 outputCloud((sensor_msgs::PointCloud2) cloud);
 
     // Set Header Information
-    outputCloud.header.frame_id = this->frame;
-    outputCloud.header.stamp = ros::Time::now();
+    outputCloud.header.frame_id = frame;
+    outputCloud.header.stamp = timeStamp;
 
     // Publish
     this->cloudPub.publish(outputCloud);
-
 }
 
-void uqr::cloudPublisher::publish(sensor_msgs::PointCloud2& cloud){
+void uqr::cloudPublisher::publish(sensor_msgs::PointCloud2& cloud, std::string frame, ros::Time timeStamp){
     // Set Header Information
-    cloud.header.frame_id = this->frame;
-    cloud.header.stamp = ros::Time::now();
+    cloud.header.frame_id = frame;
+    cloud.header.stamp = timeStamp;
 
     // Publish
     this->cloudPub.publish(cloud);
-
-    
 }
 
-void uqr::cloudPublisher::publish(pcl::PCLPointCloud2& cloud){
+void uqr::cloudPublisher::publish(pcl::PCLPointCloud2& cloud, std::string frame, ros::Time timeStamp){
     // Abuse the fact we've defined conversions in uqr::PointCloud
     uqr::PointCloud uqrCloud(cloud);
     sensor_msgs::PointCloud2 outputCloud((sensor_msgs::PointCloud2) uqrCloud);
 
     // Set Header Information
-    outputCloud.header.frame_id = this->frame;
-    outputCloud.header.stamp = ros::Time::now();
+    outputCloud.header.frame_id = frame;
+    outputCloud.header.stamp = timeStamp;
 
     // Publish
     this->cloudPub.publish(outputCloud);
 }
 
-void uqr::cloudPublisher::publish(pcl::PointCloud<pcl::PointXYZ>& cloud){
+void uqr::cloudPublisher::publish(pcl::PointCloud<pcl::PointXYZ>& cloud, std::string frame, ros::Time timeStamp){
     // Abuse the fact we've defined conversions in uqr::PointCloud
     uqr::PointCloud uqrCloud(cloud);
     sensor_msgs::PointCloud2 outputCloud((sensor_msgs::PointCloud2) uqrCloud);
 
     // Set Header Information
-    outputCloud.header.frame_id = this->frame;
-    outputCloud.header.stamp = ros::Time::now();
+    outputCloud.header.frame_id = frame;
+    outputCloud.header.stamp = timeStamp;
 
     // Publish
     this->cloudPub.publish(outputCloud);

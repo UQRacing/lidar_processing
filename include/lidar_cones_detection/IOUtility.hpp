@@ -14,8 +14,8 @@
 #define LIDAR_CONES_DETECTION_IOUTILITY_H
 
 #include "lidar_cones_detection/PCLWrapper.hpp"
-#include "pcl/io/pcd_io.h"
-#include "pcl/io/ply_io.h"
+#include <pcl/io/pcd_io.h>
+#include <pcl/io/ply_io.h>
 
 
 #include <ros/ros.h>
@@ -63,37 +63,40 @@ namespace uqr {
             /// Constructor with Topic
             cloudPublisher(std::string topic);
             
-            // Constructor with Topic and Frame
-            cloudPublisher(std::string topic, std::string frame);
-            
             // Publish Methods
             /**
              * Publish a uqr::PointCloud
              *
              * @param cloud The cloud to be published.
              */
-            void publish(PointCloud& cloud);
+            void publish(PointCloud& cloud, std::string frame="map" , ros::Time timeStamp=ros::Time::now());
 
             /**
              * Publish a sensor_msgs::PointCloud2
              *
              * @param cloud The cloud to be published.
+             * @param frame The frame in which the cloud is to be published.
+             * @param timeStamp The time-stamp with which the cloud is to be published.
              */
-            void publish(sensor_msgs::PointCloud2& cloud);
+            void publish(sensor_msgs::PointCloud2& cloud, std::string frame="map" , ros::Time timeStamp=ros::Time::now());
 
             /**
              * Publish a pcl::PCLPointCloud2
              *
              * @param cloud The cloud to be published.
+             * @param frame The frame in which the cloud is to be published.
+             * @param timeStamp The time-stamp with which the cloud is to be published.
              */
-            void publish(pcl::PCLPointCloud2& cloud);
+            void publish(pcl::PCLPointCloud2& cloud, std::string frame="map" , ros::Time timeStamp=ros::Time::now());
 
             /**
              * Publish a pcl::PointCloud<pcl::PointXYZ>
              *
              * @param cloud The cloud to be published.
+             * @param frame The frame in which the cloud is to be published.
+             * @param timeStamp The time-stamp with which the cloud is to be published.
              */
-            void publish(pcl::PointCloud<pcl::PointXYZ>& cloud);
+            void publish(pcl::PointCloud<pcl::PointXYZ>& cloud, std::string frame="map" , ros::Time timeStamp=ros::Time::now());
 
             /// Destructor
             ~cloudPublisher() = default;
@@ -101,7 +104,6 @@ namespace uqr {
         private:
             ros::NodeHandle nh;
             ros::Publisher cloudPub;
-            std::string frame;
 
     };
 
