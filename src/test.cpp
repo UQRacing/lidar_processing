@@ -5,9 +5,8 @@
 
 
 #include "lidar_cones_detection/PCLWrapper.hpp"
-#include "pcl/io/pcd_io.h"
+#include "lidar_cones_detection/IOUtility.hpp"
 
-// sorry riley i didn't save your test loop somewhere before chucking all these tests in
 
 class NodeWrapper {
 public:
