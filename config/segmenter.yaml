@@ -1,0 +1,24 @@
+segmenter:
+  cam_pose:
+    translation:
+      x: 0
+      y: 0
+      z: -2
+    rotation:
+      w: 1
+      x: 0
+      y: 0
+      z: 0
+
+  vertical_fov: 180
+  horizontal_fov: 360
+
+  vertical_resolution: 0.1
+  horizontal_resolution: 0.1
+
+  noise_level: 0.0
+  min_range: 0.0
+  border_size: 1
+
+  file_path: "/home/ubuntu/UQR-DV/dv_ws/src/data/table.pcd"
+  calibrate_pose: true

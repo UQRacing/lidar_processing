@@ -28,6 +28,10 @@
 #include <pcl/conversions.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/transforms.h>
+#include <pcl/visualization/cloud_viewer.h>
+
+#include <pcl/range_image/range_image.h>
+#include <pcl/visualization/range_image_visualizer.h>
 
 namespace uqr {
 
@@ -52,6 +56,24 @@ namespace uqr {
      * @param input_cloud Pointer to the desired input cloud. This cloud will be saved.
      */
     void write_cloud(const std::string file_path, uqr::PointCloud& input_cloud);
+
+    /**
+     * Visualise a PointCloud.
+     *
+     * A wrapper for the PCL visualiser.
+     *
+     * @param input_cloud Pointer to the desired input cloud. This cloud will be saved.
+     */
+    void view_cloud(uqr::PointCloud& input_cloud);
+
+    /**
+     * Visualise a 2.5D PointCloud.
+     *
+     * A wrapper for the PCL visualiser.
+     *
+     * @param input_image Pointer to the desired input image. This image will be saved.
+     */
+    void view_image(pcl::RangeImage::Ptr input_image);
 
     /**
      * @brief Simple PointCloud Publisher

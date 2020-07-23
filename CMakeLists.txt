@@ -8,13 +8,16 @@ find_package(catkin REQUIRED COMPONENTS
   tf2
 )
 
+find_package(PCL REQUIRED)
+find_package(Eigen3 REQUIRED)
+
 catkin_package(DEPENDS
   roscpp
   pcl_ros
   sensor_msgs
   tf2
   INCLUDE_DIRS include
-  LIBRARIES PCLWrapper
+  LIBRARIES PCLWrapper IOUtility OnlineSegment
 )
 
 ###########
@@ -27,6 +30,7 @@ include_directories(
 )
 
 # i commented these out because I don't know why they are needed? Please explain sir!?
+# They're generalised variants of the ones below. It's better practice to do what we have in target_link_libraries.
 #link_directories(${pcl_ros_LIBRARY_DIRS})
 #add_definitions(${pcl_ros_DEFINITIONS})
 
@@ -38,9 +42,12 @@ target_link_libraries(PCLWrapper ${pcl_ros_LIBRARIES})
 add_library(IOUtility STATIC src/IOUtility.cpp)
 target_link_libraries(IOUtility ${pcl_ros_LIBRARIES} PCLWrapper)
 
-add_executable(cloudFilterSample src/cloudFilter.cpp)
-target_link_libraries(cloudFilterSample ${catkin_LIBRARIES})
+add_library(OnlineSegment STATIC src/OnlineSegmentation.cpp)
+target_link_libraries(OnlineSegment ${pcl_ros_LIBRARIES} ${Eigen3_LIBRARIES} PCLWrapper IOUtility)
 
 # FIXME: delete me; this is for testing purposed
 add_executable(testing src/test.cpp)
 target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
+
+add_executable(segmentTesting src/segmentTest.cpp)
+target_link_libraries(segmentTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} OnlineSegment PCLWrapper IOUtility)

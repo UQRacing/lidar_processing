@@ -61,6 +61,22 @@ void uqr::write_cloud(const std::string file_path, uqr::PointCloud& input_cloud)
     }
 }
 
+void uqr::view_cloud(uqr::PointCloud& input_cloud){
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    *cloud = (pcl::PointCloud<pcl::PointXYZ>) input_cloud;
+    pcl::visualization::CloudViewer viewer("Cloud Viewer");
+    viewer.showCloud(cloud);
+    while (!viewer.wasStopped()){}
+}
+
+void uqr::view_image(pcl::RangeImage::Ptr input_image){
+
+    pcl::visualization::RangeImageVisualizer viewer("Image Viewer");
+    viewer.showRangeImage(*input_image);
+    while (!viewer.wasStopped()){}
+}
+
+
 uqr::cloudPublisher::cloudPublisher(std::string topic){
     // Initialise Publisher
     this->cloudPub = this->nh.advertise<sensor_msgs::PointCloud2>(topic, 10);
