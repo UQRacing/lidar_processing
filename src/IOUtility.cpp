@@ -69,14 +69,6 @@ void uqr::view_cloud(uqr::PointCloud& input_cloud){
     while (!viewer.wasStopped()){}
 }
 
-void uqr::view_image(pcl::RangeImage::Ptr input_image){
-
-    pcl::visualization::RangeImageVisualizer viewer("Image Viewer");
-    viewer.showRangeImage(*input_image);
-    while (!viewer.wasStopped()){}
-}
-
-
 uqr::cloudPublisher::cloudPublisher(std::string topic){
     // Initialise Publisher
     this->cloudPub = this->nh.advertise<sensor_msgs::PointCloud2>(topic, 10);

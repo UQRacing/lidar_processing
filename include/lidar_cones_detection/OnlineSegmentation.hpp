@@ -21,6 +21,7 @@
 #include <ros/ros.h>
 
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Image.h>
 
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
@@ -33,6 +34,8 @@
 #include <Eigen/Geometry>
 
 namespace uqr {
+    typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
+
     /**
      * @brief Online Cloud Segmenter
      *
@@ -44,40 +47,30 @@ namespace uqr {
             OnlineSegmenter();
 
             /// Functions
-            void to_range_image(uqr::PointCloud& input_cloud);
+            void segment(uqr::PointCloud input_cloud);
 
-            void calibrate_cam(uqr::PointCloud& input_cloud);
-            void set_viewer_pose(pcl::visualization::PCLVisualizer& viewer, const Eigen::Affine3f& viewer_pose);
-            
+            void angle_column();
+
             /// Destructor
             ~OnlineSegmenter() = default;
 
         private:
-            pcl::RangeImage::CoordinateFrame coordinate_frame;
-            pcl::RangeImage::Ptr rangeImage;
+            double focal_x;
+            double focal_y;
 
-            Eigen::Affine3f scene_sensor_pose;
-            float x_trans;
-            float y_trans;
-            float z_trans;
+            int height;
+            int width;
+            int centre_x;
+            int centre_y;
+            int x_offset;
+            int y_offset;
 
-            float w_rot;
-            float x_rot;
-            float y_rot;
-            float z_rot;
-
-            double vertical_fov; 
-            double horizontal_fov;
-
-            double vertical_angle_res;
-            double horizontal_angle_res;
-
-            double noise_level;
-            double min_range;
-            int border_size;
-
-            bool calibrate_pose;
+            bool view_image;
             ros::NodeHandle nh;
+
+            /// Debug
+            ros::Publisher imagePub;
+  
     };
 
 };

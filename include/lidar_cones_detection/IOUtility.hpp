@@ -67,15 +67,6 @@ namespace uqr {
     void view_cloud(uqr::PointCloud& input_cloud);
 
     /**
-     * Visualise a 2.5D PointCloud.
-     *
-     * A wrapper for the PCL visualiser.
-     *
-     * @param input_image Pointer to the desired input image. This image will be saved.
-     */
-    void view_image(pcl::RangeImage::Ptr input_image);
-
-    /**
      * @brief Simple PointCloud Publisher
      *
      * Allows easy visualisation of a variety of pointcloud types

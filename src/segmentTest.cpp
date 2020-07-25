@@ -6,15 +6,17 @@
 int main (int argc, char** argv){
   ros::init(argc, argv, "lidar_cone");
   ros::NodeHandle nh;
-  uqr::OnlineSegmenter segmenter;
-
-  uqr::PointCloud cloud;
+  uqr::PointCloud incloud;
   std::string filePath;
   nh.param<std::string>("/segmenter/file_path", filePath, "table.pcd");
-  uqr::load_cloud(filePath, cloud);
-
-  segmenter.to_range_image(cloud);
-
-  ros::spin();
-  return 0;
+  
+  uqr::load_cloud(filePath, incloud);
+  uqr::OnlineSegmenter segmenter;
+  while(ros::ok()){
+    ros::Time start = ros::Time::now();
+    segmenter.segment(incloud);
+    ros::Time end = ros::Time::now();
+    double execution_time = (end - start).toNSec() * 1e-6;
+    ROS_INFO_STREAM("Exectution time (ms): " << execution_time);
+  }
 }

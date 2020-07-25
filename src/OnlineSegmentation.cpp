@@ -6,90 +6,91 @@
  */
 
 #include "lidar_cones_detection/OnlineSegmentation.hpp"
-void uqr::OnlineSegmenter::set_viewer_pose (pcl::visualization::PCLVisualizer& viewer, const Eigen::Affine3f& viewer_pose){
-  Eigen::Vector3f pos_vector = viewer_pose * Eigen::Vector3f(0, 0, 0);
-  Eigen::Vector3f look_at_vector = viewer_pose.rotation () * Eigen::Vector3f(0, 0, 1) + pos_vector;
-  Eigen::Vector3f up_vector = viewer_pose.rotation () * Eigen::Vector3f(0, -1, 0);
-  viewer.setCameraPosition (pos_vector[0], pos_vector[1], pos_vector[2],
-                            look_at_vector[0], look_at_vector[1], look_at_vector[2],
-                            up_vector[0], up_vector[1], up_vector[2]);
-}
+
 uqr::OnlineSegmenter::OnlineSegmenter(){
-    coordinate_frame = pcl::RangeImage::CAMERA_FRAME;
-    rangeImage = pcl::RangeImage::Ptr(new pcl::RangeImage); 
+    nh.param<double>("/segmenter/focal_x", focal_x, 50);
+    nh.param<double>("/segmenter/focal_y", focal_y, 50);
+    nh.param<int>("/segmenter/height", height, 200);
+    nh.param<int>("/segmenter/width", width, 200);
+    nh.param<int>("/segmenter/x_offset", x_offset, 0);
+    nh.param<int>("/segmenter/y_offset", y_offset, -100);
 
-    nh.param<float>("/segmenter/cam_pose/translation/x", x_trans, 0);
-    nh.param<float>("/segmenter/cam_pose/translation/y", y_trans, 0);
-    nh.param<float>("/segmenter/cam_pose/translation/z", z_trans, 0);
+    centre_x = x_offset + (width/2);
+    centre_y = y_offset + (height/2);
 
-    nh.param<float>("/segmenter/cam_pose/rotation/w", w_rot, 1);
-    nh.param<float>("/segmenter/cam_pose/rotation/x", x_rot, 0);
-    nh.param<float>("/segmenter/cam_pose/rotation/y", y_rot, 0);
-    nh.param<float>("/segmenter/cam_pose/rotation/z", z_rot, 0);
-
-    scene_sensor_pose =  Eigen::Affine3f(Eigen::Affine3f::Identity());
-    scene_sensor_pose.translate(Eigen::Vector3f(x_trans,y_trans,z_trans));
-    scene_sensor_pose.rotate(Eigen::Quaternionf(w_rot,x_rot,y_rot,z_rot));
-
-    nh.param<double>("/segmenter/vertical_fov", vertical_fov, 180);
-    nh.param<double>("/segmenter/horizontal_fov", horizontal_fov, 360);
+    nh.param<bool>("/segmenter/view_image", view_image, false);
     
-    nh.param<double>("/segmenter/vertical_resolution", vertical_angle_res, 0.1);
-    nh.param<double>("/segmenter/horizontal_resolution", horizontal_angle_res, 0.1);
-
-    nh.param<double>("/segmenter/noise", noise_level, 0.0);
-    nh.param<double>("/segmenter/min_range", min_range, 0.0);
-    nh.param<int>("/segmenter/border_size", border_size, 1);
-
-    nh.param<bool>("/segmenter/calibrate_pose", calibrate_pose, false);
+    imagePub = nh.advertise<sensor_msgs::Image>("/UQR/segment/image", 10);
 }
 
-void uqr::OnlineSegmenter::to_range_image(uqr::PointCloud& input_cloud){
+void uqr::OnlineSegmenter::segment(uqr::PointCloud input_cloud){
+    uqr::MatrixXd depthImage = uqr::MatrixXd::Zero(width,height); // This is very costly (adds 4ms to what would be 2ms)
+    pcl::PointCloud<pcl::PointXYZ> cloud(input_cloud);
 
-    rangeImage->createFromPointCloud((pcl::PointCloud<pcl::PointXYZ>) input_cloud, 
-                                      pcl::deg2rad(horizontal_angle_res), pcl::deg2rad(vertical_angle_res),
-                                      pcl::deg2rad(horizontal_fov), pcl::deg2rad(vertical_fov),
-                                      scene_sensor_pose, coordinate_frame, noise_level, min_range, border_size);
-
-    if(calibrate_pose){
-        calibrate_cam(input_cloud);
-    }
-}
-
-void uqr::OnlineSegmenter::calibrate_cam(uqr::PointCloud& input_cloud){
-
-    pcl::visualization::PCLVisualizer viewer ("3D Viewer");
-    viewer.setBackgroundColor (1, 1, 1);
-    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointWithRange> range_image_color_handler (rangeImage, 0, 0, 0);
-    viewer.addPointCloud (rangeImage, range_image_color_handler, "range image");
-    viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "range image");
-
-    viewer.initCameraParameters ();
-    set_viewer_pose(viewer, rangeImage->getTransformationToWorldSystem ());
+    double max_depth = 1;
     
-    pcl::visualization::RangeImageVisualizer range_image_widget ("Range image");
-    range_image_widget.showRangeImage(*rangeImage);
-    
-    while (!viewer.wasStopped ())
-    {
-        range_image_widget.spinOnce ();
-        viewer.spinOnce ();
-        pcl_sleep (0.01);
+    for (int i=0; i<cloud.size();i++){
+        // Note for those asking why I'm letting 'z' = 'x',         ...coordinate systems be wack.
+        double z = cloud.points[i].x;
+        double u = (cloud.points[i].y*focal_x) / z;
+        double v = (cloud.points[i].z*focal_y) / z;
+        int pixel_pos_x = (int)(u + centre_x);
+        int pixel_pos_y = (int)(v + centre_y);
+
+        if (pixel_pos_x > (width-1)){
+        pixel_pos_x = width -1;
+        }
+        else if( pixel_pos_x < 0){
+        pixel_pos_x = 0;
+        }
+        if (pixel_pos_y > (height-1)){
+        pixel_pos_y = height-1;
+        }
+        else if( pixel_pos_y < 0){
+        pixel_pos_y = 0;
+        }
         
-        if (true){
-        scene_sensor_pose = viewer.getViewerPose();
-        rangeImage->createFromPointCloud((pcl::PointCloud<pcl::PointXYZ>) input_cloud, 
-                                      pcl::deg2rad(horizontal_angle_res), pcl::deg2rad(vertical_angle_res),
-                                      pcl::deg2rad(horizontal_fov), pcl::deg2rad(vertical_fov),
-                                      scene_sensor_pose, coordinate_frame, noise_level, min_range, border_size);
-        range_image_widget.showRangeImage(*rangeImage);
+        // This has the potential to overwrite image data, but that is something we'll have to live with for the moment
+        depthImage(pixel_pos_x,pixel_pos_y) = i+1;
+        
+        if(view_image){
+            double norm = sqrt(pow(cloud.points[i].x,2)+pow(cloud.points[i].y,2)+pow(cloud.points[i].z,2));
+            // ROS_INFO("X: %d Y: %d Value: %0.2f",pixel_pos_x,pixel_pos_y,norm);
+            if(norm > max_depth){
+                max_depth = norm;
+            }
         }
     }
+    if(view_image){ 
+        double rangeScale = 255/max_depth;
+        sensor_msgs::Image output_image;
+        output_image.encoding = "mono8";
+        output_image.header.stamp = ros::Time::now();
+        output_image.height = height;
+        output_image.width = width;
+        output_image.step = width;
+        output_image.is_bigendian = false;
+        for(int h=0; h < height;h++){
+            for(int w=0; w < width;w++){
+                int i = depthImage(w,h)-1;
+                if(i>0){
+                    double norm = sqrt(pow(cloud.points[i].x,2)+pow(cloud.points[i].y,2)+pow(cloud.points[i].z,2));
+                    output_image.data.push_back((int)norm*rangeScale);
+                    // output_image.data.push_back((int)(norm*255/max_depth));
+                }
+                else{
+                    output_image.data.push_back(0);
+                }
+                
+            }
+        }
+        imagePub.publish(output_image);
+    }
+}
 
-    Eigen::Quaternionf q = Eigen::Quaternionf(scene_sensor_pose.rotation());
-    Eigen::Vector3f v = scene_sensor_pose.translation();
-    std::cout << "Rotation: " << std::endl << q.w() << std::endl << q.vec() <<std::endl;
-    std::cout << "Translation: " << std::endl << v << std::endl;
+void uqr::OnlineSegmenter::angle_column(){
+
+
 }
 
 
