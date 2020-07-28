@@ -44,3 +44,9 @@ target_link_libraries(cloudFilterSample ${catkin_LIBRARIES})
 # FIXME: delete me; this is for testing purposed
 add_executable(testing src/test.cpp)
 target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
+
+add_executable(sacTesting src/sacSegmenter.cpp)
+target_link_libraries(sacTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
+
+add_executable(morphtesting src/morphFilter.cpp)
+target_link_libraries(morphtesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)

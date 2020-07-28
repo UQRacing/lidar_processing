@@ -1,0 +1,11 @@
+segmenter:
+  file_path: "/home/ubuntu/UQR-DV/dv_ws/src/data/realsense.pcd"
+  voxel_size: 0.01
+  view_image: true
+
+  focal_x: 150
+  focal_y: 500
+  width: 200
+  height: 200
+  x_offset: 0
+  y_offset: -80
