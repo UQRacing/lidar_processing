@@ -6,16 +6,19 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   tf2
+  cv_bridge
 )
 
 find_package(PCL REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(OpenCV REQUIRED)
 
 catkin_package(DEPENDS
   roscpp
   pcl_ros
   sensor_msgs
   tf2
+  cv_bridge
   INCLUDE_DIRS include
   LIBRARIES PCLWrapper IOUtility OnlineSegment
 )
@@ -27,6 +30,7 @@ catkin_package(DEPENDS
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 # i commented these out because I don't know why they are needed? Please explain sir!?
@@ -43,7 +47,7 @@ add_library(IOUtility STATIC src/IOUtility.cpp)
 target_link_libraries(IOUtility ${pcl_ros_LIBRARIES} PCLWrapper)
 
 add_library(OnlineSegment STATIC src/OnlineSegmentation.cpp)
-target_link_libraries(OnlineSegment ${pcl_ros_LIBRARIES} ${Eigen3_LIBRARIES} PCLWrapper IOUtility)
+target_link_libraries(OnlineSegment ${pcl_ros_LIBRARIES} ${OpenCV_INCLUDE_DIRS} ${Eigen3_LIBRARIES} PCLWrapper IOUtility)
 
 # FIXME: delete me; this is for testing purposed
 add_executable(testing src/test.cpp)

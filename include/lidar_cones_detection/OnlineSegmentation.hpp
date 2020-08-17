@@ -33,8 +33,41 @@
 
 #include <Eigen/Geometry>
 
+#include <opencv2/core/mat.hpp>
+
 namespace uqr {
     typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXd;
+
+    class ProjectionParams{
+        public:
+            ProjectionParams();
+
+            void fill_angles();
+            
+            void find_closest();
+
+            void index_to_angle();
+
+            void angle_to_index();
+        private:
+            float min_angle;
+            float max_angle;
+            int step;
+
+            std::vector<float> angles;
+            
+    };
+
+    class Projector{
+        public:
+            Projector();
+            void pointcloud_to_depthimage(); // Read off Ray to find row, calc col from xy co-ords. Populate depthimage.
+        private:
+            ProjectionParams rowParams;
+            ProjectionParams colParams;
+
+            cv::Mat depthImage;
+    };
 
     /**
      * @brief Online Cloud Segmenter

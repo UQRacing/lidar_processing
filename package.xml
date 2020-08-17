@@ -24,6 +24,7 @@
   <!-- ROS Packages -->
   <depend>roscpp</depend>
   <depend>tf2</depend>
+  <depend>cv_bridge</depend>
 
   <!-- Messages -->
   <depend>sensor_msgs</depend>
