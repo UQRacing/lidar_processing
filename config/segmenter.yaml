@@ -2,6 +2,7 @@ segmenter:
   file_path: "/home/ubuntu/UQR-DV/dv_ws/src/data/realsense.pcd"
   voxel_size: 0.01
   view_image: true
+  topic: ""
 
   focal_x: 150
   focal_y: 500

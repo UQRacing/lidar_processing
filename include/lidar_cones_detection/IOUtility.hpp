@@ -62,6 +62,7 @@ namespace uqr {
         public:
             /// Constructor with Topic
             cloudPublisher(std::string topic);
+            cloudPublisher(){};
             
             // Publish Methods
             /**

@@ -48,5 +48,5 @@ target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IO
 add_executable(sacTesting src/sacSegmenter.cpp)
 target_link_libraries(sacTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
 
-add_executable(morphtesting src/morphFilter.cpp)
-target_link_libraries(morphtesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
+#add_executable(morphtesting src/morphFilter.cpp)
+#target_link_libraries(morphtesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
