@@ -1,6 +1,7 @@
 #include "lidar_cones_detection/PCLWrapper.hpp"
 #include "lidar_cones_detection/IOUtility.hpp"
-#include "lidar_cones_detection/OnlineSegmentation.hpp"
+#include "lidar_cones_detection/Projector.hpp"
+#include "lidar_cones_detection/ProjectionParameters.hpp"
 
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
