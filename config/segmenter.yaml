@@ -1,5 +1,5 @@
 segmenter:
-  file_path: "/home/ubuntu/UQR-DV/dv_ws/src/data/livox.pcd"
+  file_path: "/home/ubuntu/data/vlp.pcd"
   view_image: true
 
   focal_x: 400

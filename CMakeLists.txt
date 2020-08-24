@@ -47,11 +47,11 @@ add_library(IOUtility STATIC src/IOUtility.cpp)
 target_link_libraries(IOUtility ${pcl_ros_LIBRARIES} PCLWrapper)
 
 add_library(OnlineSegment STATIC src/OnlineSegmentation.cpp)
-target_link_libraries(OnlineSegment ${pcl_ros_LIBRARIES} ${OpenCV_INCLUDE_DIRS} ${Eigen3_LIBRARIES} PCLWrapper IOUtility)
+target_link_libraries(OnlineSegment ${pcl_ros_LIBRARIES} ${OpenCV_LIBRARIES} ${Eigen3_LIBRARIES} PCLWrapper IOUtility)
 
 # FIXME: delete me; this is for testing purposed
 add_executable(testing src/test.cpp)
 target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
 
 add_executable(segmentTesting src/segmentTest.cpp)
-target_link_libraries(segmentTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} OnlineSegment PCLWrapper IOUtility)
+target_link_libraries(segmentTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} OnlineSegment PCLWrapper IOUtility)

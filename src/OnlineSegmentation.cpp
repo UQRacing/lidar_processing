@@ -7,91 +7,111 @@
 
 #include "lidar_cones_detection/OnlineSegmentation.hpp"
 
-uqr::OnlineSegmenter::OnlineSegmenter(){
-    nh.param<double>("/segmenter/focal_x", focal_x, 50);
-    nh.param<double>("/segmenter/focal_y", focal_y, 50);
-    nh.param<int>("/segmenter/height", height, 200);
-    nh.param<int>("/segmenter/width", width, 200);
-    nh.param<int>("/segmenter/x_offset", x_offset, 0);
-    nh.param<int>("/segmenter/y_offset", y_offset, -100);
-
-    centre_x = x_offset + (width/2);
-    centre_y = y_offset + (height/2);
-
-    nh.param<bool>("/segmenter/view_image", view_image, false);
-    
-    imagePub = nh.advertise<sensor_msgs::Image>("/UQR/segment/image", 10);
+uqr::ProjectionParams::ProjectionParams(){
+    this->num_beams = 0;
+    this->step = 0;
+    this->min_angle = 0;
+    this->max_angle = 0;
 }
 
-void uqr::OnlineSegmenter::segment(uqr::PointCloud input_cloud){
-    uqr::MatrixXd depthImage = uqr::MatrixXd::Zero(width,height); // This is very costly (adds 4ms to what would be 2ms)
-    pcl::PointCloud<pcl::PointXYZ> cloud(input_cloud);
+uqr::ProjectionParams::ProjectionParams(float min_angle, float max_angle, float step){
+    this->num_beams = floor((max_angle - min_angle) / step);
+    this->step = step;
+    this->min_angle = min_angle;
+    this->max_angle = max_angle;
+}
 
-    double max_depth = 1;
-    
-    for (int i=0; i<cloud.size();i++){
-        // Note for those asking why I'm letting 'z' = 'x',         ...coordinate systems be wack.
-        double z = cloud.points[i].x;
-        double u = (cloud.points[i].y*focal_x) / z;
-        double v = (cloud.points[i].z*focal_y) / z;
-        int pixel_pos_x = (int)(u + centre_x);
-        int pixel_pos_y = (int)(v + centre_y);
+uqr::ProjectionParams::ProjectionParams(float min_angle, float max_angle, int num_beams){
+    this->num_beams = num_beams;
+    this->step = step = (max_angle - min_angle) / num_beams;
+    this->min_angle = min_angle;
+    this->max_angle = max_angle;
+}
 
-        if (pixel_pos_x > (width-1)){
-        pixel_pos_x = width -1;
-        }
-        else if( pixel_pos_x < 0){
-        pixel_pos_x = 0;
-        }
-        if (pixel_pos_y > (height-1)){
-        pixel_pos_y = height-1;
-        }
-        else if( pixel_pos_y < 0){
-        pixel_pos_y = 0;
-        }
-        
-        // This has the potential to overwrite image data, but that is something we'll have to live with for the moment
-        depthImage(pixel_pos_x,pixel_pos_y) = i+1;
-        
-        if(view_image){
-            double norm = sqrt(pow(cloud.points[i].x,2)+pow(cloud.points[i].y,2)+pow(cloud.points[i].z,2));
-            // ROS_INFO("X: %d Y: %d Value: %0.2f",pixel_pos_x,pixel_pos_y,norm);
-            if(norm > max_depth){
-                max_depth = norm;
-            }
-        }
-    }
-    if(view_image){ 
-        double rangeScale = 255/max_depth;
-        sensor_msgs::Image output_image;
-        output_image.encoding = "mono8";
-        output_image.header.stamp = ros::Time::now();
-        output_image.height = height;
-        output_image.width = width;
-        output_image.step = width;
-        output_image.is_bigendian = false;
-        for(int h=0; h < height;h++){
-            for(int w=0; w < width;w++){
-                int i = depthImage(w,h)-1;
-                if(i>0){
-                    double norm = sqrt(pow(cloud.points[i].x,2)+pow(cloud.points[i].y,2)+pow(cloud.points[i].z,2));
-                    output_image.data.push_back((int)norm*rangeScale);
-                    // output_image.data.push_back((int)(norm*255/max_depth));
-                }
-                else{
-                    output_image.data.push_back(0);
-                }
-                
-            }
-        }
-        imagePub.publish(output_image);
+void uqr::ProjectionParams::fill_angles(){
+    float angle = this->min_angle;
+    for(int i=0; i < this->num_beams; i++){
+        angles.push_back(angle);
+        angle += this->step;
     }
 }
 
-void uqr::OnlineSegmenter::angle_column(){
+int uqr::ProjectionParams::find_closest(float angle){
+    size_t found = 0;
+    if (this->angles.front() < this->angles.back()) {
+        found = std::upper_bound(this->angles.begin(), this->angles.end(), angle) - this->angles.begin();
+    } else {
+        found = this->angles.rend() - std::upper_bound(this->angles.rbegin(), this->angles.rend(), angle);
+    }
+    if (found == 0) {
+        return found;
+    }
+    if (found == this->angles.size()) {
+        return found - 1;
+    }
+    auto diff_next = fabs(this->angles[found] - angle);
+    auto diff_prev = fabs(angle - this->angles[found - 1]);
+    return diff_next < diff_prev ? found : found - 1;
+}
 
+float uqr::ProjectionParams::from_index(int index){
+    return this->angles[index];
+}
 
+int uqr::ProjectionParams::from_angle(float angle){
+    return find_closest(angle);
+}
+
+void uqr::ProjectionParams::show_angles(){
+    for (auto i = this->angles.begin(); i != this->angles.end(); ++i){
+        std::cout << *i << ' ';
+    }
+    std::cout << std::endl;
+}
+
+int uqr::ProjectionParams::len(){
+    return this->num_beams;
+}
+
+uqr::Projector::Projector(){
 }
 
 
+uqr::Projector::Projector(uqr::ProjectionParams rowParams, uqr::ProjectionParams colParams){
+    this->rowParams = rowParams;
+    this->colParams = colParams;
 
+    this->rowParams.fill_angles();
+    this->colParams.fill_angles();
+    this->depthImage = cv::Mat::zeros(this->rowParams.len(), this->colParams.len(), cv::DataType<float>::type);
+}
+
+void uqr::Projector::convert(pcl::PointCloud<pcl::PointXYZ> inputCloud){
+    this->max_depth = 0.0;
+    for(int index=0;index<inputCloud.size();index++){
+        pcl::PointXYZ point = inputCloud[index];
+        float depth = pow(pow(point.x,2)+pow(point.y,2)+pow(point.z,2),0.5);
+        if(depth < 0.01f){ // Check Min Threshold
+            continue;
+        }
+
+        // Get Pixel
+        int row = this->rowParams.from_angle(asin(point.z / depth));
+        int col = this->colParams.from_angle(atan2(point.y,point.x));
+        float current_depth = this->depthImage.at<float>(row, col);
+        if (depth > current_depth) {
+            this->depthImage.at<float>(row, col) = depth;
+            if(depth > max_depth){
+                this->max_depth = depth;
+            }
+        }
+    }
+}
+
+cv::Mat uqr::Projector::get_depth(){
+    return this->depthImage;
+}
+
+float uqr::Projector::get_max_depth(){
+    return this->max_depth;
+}
