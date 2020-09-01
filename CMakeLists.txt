@@ -32,7 +32,7 @@ include_directories(
 
 # gotta link those pcl_ros_LIBRARIES or the whole thing breaks
 # also the wrapper is being compiled as a library not an executable for obvious reasons
-add_library(PCLWrapper STATIC src/PCLWrapper.cpp)
+add_library(PCLWrapper STATIC src/UQRPointCloud.cpp)
 target_link_libraries(PCLWrapper ${pcl_ros_LIBRARIES})
 
 add_library(IOUtility STATIC src/IOUtility.cpp)
