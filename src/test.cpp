@@ -56,9 +56,6 @@ void NodeWrapper::lidarReadCallback(const sensor_msgs::PointCloud2::ConstPtr& sc
 
     sensor_msgs::PointCloud2::Ptr outputCloud = *pointCloud;
 
-    outputCloud->header.frame_id = "map";
-    outputCloud->header.stamp = ros::Time::now();
-
     out.publish(*outputCloud);
 
     // simplest check for size change
