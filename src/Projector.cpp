@@ -1,6 +1,6 @@
 /**
  * @author Riley Bowyer
- * @date 23-07-2020
+ * @date 24-08-2020
  *
  * @brief Projector source
  */
@@ -12,9 +12,6 @@ uqr::Projector::Projector(){
     this->rowParams = ProjectionParams();
     this->colParams = ProjectionParams();
 
-    this->rowParams.fill_angles();
-    this->colParams.fill_angles();
-
     this->depthImage = cv::Mat::zeros(this->rowParams.len(), this->colParams.len(), cv::DataType<float>::type);
 }
 
@@ -23,15 +20,15 @@ uqr::Projector::Projector(uqr::ProjectionParams rowParams, uqr::ProjectionParams
     this->rowParams = rowParams;
     this->colParams = colParams;
 
-    this->rowParams.fill_angles();
-    this->colParams.fill_angles();
     this->depthImage = cv::Mat::zeros(this->rowParams.len(), this->colParams.len(), cv::DataType<float>::type);
 }
 
-void uqr::Projector::convert(pcl::PointCloud<pcl::PointXYZ> inputCloud){
+void uqr::Projector::convert(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud){
     this->max_depth = 0.0;
-    for(int index=0;index<inputCloud.size();index++){
-        pcl::PointXYZ point = inputCloud[index];
+    this->depthImage = cv::Mat::zeros(this->rowParams.len(), this->colParams.len(), cv::DataType<float>::type);
+    
+    for(int index=0;index<inputCloud->size();index++){
+        pcl::PointXYZ point = inputCloud->points[index];
         float depth = pow(pow(point.x,2)+pow(point.y,2)+pow(point.z,2),0.5);
         if(depth < 0.01f){ // Check Min Threshold
             continue;
@@ -50,8 +47,8 @@ void uqr::Projector::convert(pcl::PointCloud<pcl::PointXYZ> inputCloud){
     }
 }
 
-cv::Mat uqr::Projector::get_depth(){
-    return this->depthImage;
+cv::Mat* uqr::Projector::get_depth(){
+    return &this->depthImage;
 }
 
 float uqr::Projector::get_max_depth(){

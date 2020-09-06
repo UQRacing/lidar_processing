@@ -1,6 +1,6 @@
 /**
  * @author Riley Bowyer
- * @date 23-07-2020
+ * @date 24-08-2020
  *
  * @brief Projection Parameter source
  */
@@ -32,6 +32,8 @@ void uqr::ProjectionParams::fill_angles(){
     float angle = this->min_angle;
     for(int i=0; i < this->num_beams; i++){
         angles.push_back(angle);
+        sines.push_back(sin(angle));
+        cosines.push_back(cos(angle));
         angle += this->step;
     }
 }
@@ -60,6 +62,14 @@ float uqr::ProjectionParams::from_index(int index){
 
 int uqr::ProjectionParams::from_angle(float angle){
     return find_closest(angle);
+}
+
+std::vector<float> uqr::ProjectionParams::sines_vector(){
+    return this->sines;
+}
+
+std::vector<float> uqr::ProjectionParams::cosines_vector(){
+    return this->cosines;
 }
 
 void uqr::ProjectionParams::show_angles(){

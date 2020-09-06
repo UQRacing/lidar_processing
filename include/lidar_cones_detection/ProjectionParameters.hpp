@@ -1,6 +1,6 @@
 /**
  * @author Riley Bowyer
- * @date 23-07-2020
+ * @date 24-08-2020
  *
  * @brief Projection Parameter library
  *  This library introduces:
@@ -80,6 +80,24 @@ namespace uqr {
             int from_angle(float angle);
 
             /**
+            * Cosines of angle vector
+            *
+            * Return the cos of the angles stored in the angle vector
+            *
+            * @return Correspdoning cos vector.
+            */
+            std::vector<float> cosines_vector();
+
+            /**
+            * Sines of angle vector
+            *
+            * Return the sin of the angles stored in the angle vector
+            *
+            * @return Correspdoning sin vector.
+            */
+            std::vector<float> sines_vector();
+
+            /**
             * Angle Vector Length
             *
             * Return the length of the internal angle vector.
@@ -110,6 +128,8 @@ namespace uqr {
 
             /// Angle Vector
             std::vector<float> angles;
+            std::vector<float> sines;
+            std::vector<float> cosines;
             
     };
 } // NAMESPACE uqr

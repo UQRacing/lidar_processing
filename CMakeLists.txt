@@ -20,7 +20,12 @@ catkin_package(DEPENDS
   tf2
   cv_bridge
   INCLUDE_DIRS include
-  LIBRARIES PCLWrapper IOUtility ProjectionParameters Projector
+
+  LIBRARIES 
+  PCLWrapper 
+  IOUtility 
+  ProjectionParameters 
+  Projector
 )
 
 ###########
@@ -48,6 +53,12 @@ add_library(ProjectionParameters STATIC src/ProjectionParameters.cpp)
 add_library(Projector STATIC src/Projector.cpp)
 target_link_libraries(Projector ${OpenCV_LIBRARIES} PCLWrapper ProjectionParameters)
 
+add_library(Cluster STATIC src/Cluster.cpp)
+target_link_libraries(Cluster ${OpenCV_LIBRARIES})
+
+add_library(GroundRemover STATIC src/GroundRemoval.cpp)
+target_link_libraries(GroundRemover ${OpenCV_LIBRARIES} Projector PCLWrapper ProjectionParameters Cluster)
+
 ################
 ## Executable ##
 ################
@@ -57,4 +68,4 @@ add_executable(testing src/test.cpp)
 target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
 
 add_executable(segmentTesting src/segmentTest.cpp)
-target_link_libraries(segmentTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} Projector ProjectionParameters PCLWrapper IOUtility)
+target_link_libraries(segmentTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} GroundRemover Projector ProjectionParameters PCLWrapper IOUtility Cluster)

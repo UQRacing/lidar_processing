@@ -1,5 +1,6 @@
 segmenter:
   file_path: "/home/ubuntu/data/vlp.pcd"
+  # file_path: "/home/ubuntu/data/depth.png"
   view_image: true
 
   focal_x: 400

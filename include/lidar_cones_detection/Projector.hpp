@@ -1,6 +1,6 @@
 /**
  * @author Riley Bowyer
- * @date 23-07-2020
+ * @date 24-08-2020
  *
  * @brief Projector library
  *  This library introduces:
@@ -57,7 +57,7 @@ namespace uqr {
             *
             * @param depthImage Cloud to project.
             */
-            void convert(pcl::PointCloud<pcl::PointXYZ> inputCloud);
+            void convert(const pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud);
 
             /**
             * Maximum Depth
@@ -75,7 +75,7 @@ namespace uqr {
             *
             * @return The _depth_.
             */
-            cv::Mat get_depth();
+            cv::Mat* get_depth();
         private:
             /// Sensor Angle Parameters
             ProjectionParams rowParams;
