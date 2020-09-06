@@ -80,7 +80,7 @@ void uqr::GroundRemover::remove_ground(const cv::Mat& depth_image, const cv::Mat
 
 	auto label_image_ptr = labeler.label_image();
 
-	cv::Mat kernel = this->depthUtil.uniform_kernal(this->windowSize, CV_8U);
+	cv::Mat kernel = this->depthUtil.uniform_kernal(std::max(this->windowSize - 2, 3), CV_8U);
 	cv::Mat dilated = cv::Mat::zeros(label_image_ptr->size(), label_image_ptr->type());
 	cv::dilate(*label_image_ptr, dilated, kernel);
 	for (int r = 0; r < dilated.rows; ++r) {

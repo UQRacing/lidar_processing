@@ -58,7 +58,7 @@ add_library(Projector STATIC src/Projector.cpp)
 target_link_libraries(Projector ${OpenCV_LIBRARIES} PCLWrapper ProjectionParameters)
 
 add_library(Cluster STATIC src/Cluster.cpp)
-target_link_libraries(Cluster ${OpenCV_LIBRARIES})
+target_link_libraries(Cluster ${OpenCV_LIBRARIES} ProjectionParameters)
 
 add_library(ImageUtil STATIC src/ImageUtil.cpp)
 target_link_libraries(ImageUtil ${OpenCV_LIBRARIES})

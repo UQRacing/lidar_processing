@@ -4,5 +4,5 @@ segmenter:
   ground_angle: 10.0
   ground_window: 7
 
-  segment_angle: 10.0
+  segment_angle: 10
   segment_window: 7

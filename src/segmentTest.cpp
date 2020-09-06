@@ -41,8 +41,8 @@ int main (int argc, char** argv){
 
 	// Init Segmenters
 	uqr::Projector projector(rowAngles,colAngles);
-	uqr::GroundRemover ground(rowAngles,colAngles,10,5);
-	uqr::ConeSegmenter cones(rowAngles,colAngles,10,5);
+	uqr::GroundRemover ground(rowAngles,colAngles,ground_angle,ground_window);
+	uqr::ConeSegmenter cones(rowAngles,colAngles,segment_angle,segment_window);
 
 	// Init Pubs
 	uqr::ImagePublisher colPub("/colour");

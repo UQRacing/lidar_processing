@@ -12,6 +12,9 @@
 #ifndef CLUSTER_H
 #define CLUSTER_H
 
+#include "lidar_cones_detection/ProjectionParameters.hpp"
+
+
 /// External Libraries
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/mat.hpp>
@@ -94,8 +97,10 @@ namespace uqr {
              *
              * @param start The coordinate to start at.
              * @param label Label to be assigned.
+             * @param colAngles LiDAR Azimuth Col angles.
+             * @param rowAngles LiDAR Azimuth Row angles.
              */
-            void horizontal_search(PointCord start, uint16_t label);
+            void horizontal_search(PointCord start, ProjectionParams colAngles, ProjectionParams rowAngles, uint16_t label);
 
             /**
              * Assign a point a corresponding label.

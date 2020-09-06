@@ -95,7 +95,7 @@ void uqr::Cluster::vertical_search(uqr::PointCord start, uint16_t label){
     }
 }
 
-void uqr::Cluster::horizontal_search(uqr::PointCord start, uint16_t label){
+void uqr::Cluster::horizontal_search(uqr::PointCord start, uqr::ProjectionParams colAngles, uqr::ProjectionParams rowAngles, uint16_t label){
 
     std::queue<uqr::PointCord> labeling_queue;
     labeling_queue.push(start);
@@ -144,7 +144,13 @@ void uqr::Cluster::horizontal_search(uqr::PointCord start, uint16_t label){
 
             // Calc Diff
             float diff;
-            float angle_diff = this->get_angle(neighbour) - this->get_angle(current); // CHECK
+            float angle_diff;
+            if(current.r != neighbour.r){
+                angle_diff = fabs(rowAngles.from_index(neighbour.r) - rowAngles.from_index(current.r));
+            }
+            else{
+                angle_diff = fabs(colAngles.from_index(neighbour.c) - colAngles.from_index(current.c));
+            }
             float d1 = this->get_depth(current);
             float d2 = this->get_depth(neighbour);
             if(d1 > d2){

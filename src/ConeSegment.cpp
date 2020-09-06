@@ -12,19 +12,11 @@ uqr::ConeSegmenter::ConeSegmenter(ProjectionParams rowParams, ProjectionParams c
     this->colParams = colParams;
 
     this->labeler = uqr::Cluster(this->rowParams.len(),colParams.len(),angleStep*M_PI/180);
-	this->col_angles = cv::Mat::zeros(rowParams.len(),colParams.len(), cv::DataType<float>::type);
-
-	for(int r = 0; r < this->col_angles.rows; r++){
-		for(int c = 0; c < this->col_angles.cols; c++){
-			this->col_angles.at<float>(r,c) = this->colParams.from_index(c);
-		}
-	}
 	this->windowSize = windowSize;
 }
 
 void uqr::ConeSegmenter::process_image(const cv::Mat& depth_image){
     this->labeler.set_depth(depth_image);
-    this->labeler.set_angle(this->col_angles);
 
     this->labels = 1;
 	this->labeler.clear_labels();
@@ -37,7 +29,7 @@ void uqr::ConeSegmenter::process_image(const cv::Mat& depth_image){
 			if (depth_image.at<float>(row, col) < 0.001f){
 			continue;
 			}
-			this->labeler.horizontal_search(uqr::PointCord(row, col), this->labels);
+			this->labeler.horizontal_search(uqr::PointCord(row, col),this->colParams,this->rowParams, this->labels);
 			this->labels++;
 		}
     }
