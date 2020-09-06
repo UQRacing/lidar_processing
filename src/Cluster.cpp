@@ -18,12 +18,12 @@ uqr::Cluster::Cluster(uint16_t rows, uint16_t cols, float angleThresh){
 
     int16_t counter = 0;
     for (int16_t r = this->ROWS; r > 0; --r) {
-      this->Neighbourhood[counter++] = uqr::PointCord(-r, 0);
-      this->Neighbourhood[counter++] = uqr::PointCord(r, 0);
+        this->Neighbourhood[counter++] = uqr::PointCord(-r, 0);
+        this->Neighbourhood[counter++] = uqr::PointCord(r, 0);
     }
     for (int16_t c = this->COLS; c > 0; --c) {
-      this->Neighbourhood[counter++] = uqr::PointCord(0, -c);
-      this->Neighbourhood[counter++] = uqr::PointCord(0, c);
+        this->Neighbourhood[counter++] = uqr::PointCord(0, -c);
+        this->Neighbourhood[counter++] = uqr::PointCord(0, c);
     }
 }
 
@@ -89,7 +89,7 @@ void uqr::Cluster::vertical_search(uqr::PointCord start, uint16_t label){
             // Calc Diff
             float diff = abs(this->get_angle(current) - this->get_angle(neighbour));
             if (diff <= this->angleThresh) {
-            labeling_queue.push(neighbour);
+                labeling_queue.push(neighbour);
             }
         }
     }
@@ -153,7 +153,6 @@ void uqr::Cluster::horizontal_search(uqr::PointCord start, uint16_t label){
             else{
                 diff = atan2(d1*sin(angle_diff),d2-d1*cos(angle_diff));
             }
-            std::cout << "Diff: " << diff << std::endl;
             if (diff >= this->angleThresh) {
                 labeling_queue.push(neighbour);
             }

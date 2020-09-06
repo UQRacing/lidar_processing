@@ -46,23 +46,44 @@ namespace uqr {
             /// Constructor
             ConeSegmenter(ProjectionParams rowParams, ProjectionParams colParams, float angleStep, int windowSize);
 
-           
+            /**
+             * Cluster Points!
+             *
+             * @param depth_image The image to be segmented.
+             */
             void process_image(const cv::Mat& depth_image);
 
-            void segment_cones(const cv::Mat& depth_image);
+            /**
+             * Get the total number of segments.
+             */
+            int segments();
 
-            int total_segments();
+            /**
+             * Get the label image.
+             */
             cv::Mat label_image();
 
+            /**
+             * Get a cluster by ID.
+             *
+             * @param depth_image The depth image to be masked.
+             * @param id Segment ID.
+             */
             cv::Mat get_cluster(const cv::Mat& depth_image, int id);
+
         private:
             /// Sensor Angle Parameters
             ProjectionParams rowParams;
             ProjectionParams colParams;
+
+            /// Image Utils
             Cluster labeler;
             ImageUtil depthUtil;
+
+            /// Images
             cv::Mat col_angles;
 
+            /// Misc Variables
             float angleStep;
             int windowSize;
             int labels;

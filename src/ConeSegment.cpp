@@ -10,27 +10,23 @@
 uqr::ConeSegmenter::ConeSegmenter(ProjectionParams rowParams, ProjectionParams colParams, float angleStep, int windowSize){
     this->rowParams = rowParams;
     this->colParams = colParams;
-    this->labeler = uqr::Cluster(this->rowParams.len(),this->colParams.len(),this->angleStep*M_PI/180);
-	this->col_angles = cv::Mat::zeros(this->rowParams.len(),this->colParams.len(), cv::DataType<float>::type);
+
+    this->labeler = uqr::Cluster(this->rowParams.len(),colParams.len(),angleStep*M_PI/180);
+	this->col_angles = cv::Mat::zeros(rowParams.len(),colParams.len(), cv::DataType<float>::type);
 
 	for(int r = 0; r < this->col_angles.rows; r++){
 		for(int c = 0; c < this->col_angles.cols; c++){
 			this->col_angles.at<float>(r,c) = this->colParams.from_index(c);
 		}
 	}
-    this->windowSize = windowSize;
+	this->windowSize = windowSize;
 }
 
 void uqr::ConeSegmenter::process_image(const cv::Mat& depth_image){
-
     this->labeler.set_depth(depth_image);
     this->labeler.set_angle(this->col_angles);
 
-    this->segment_cones(depth_image);
-}
-
-void uqr::ConeSegmenter::segment_cones(const cv::Mat& depth_image){
-	this->labels = 1;
+    this->labels = 1;
 	this->labeler.clear_labels();
     auto label_image_ptr = this->labeler.label_image();
     for (int row = 0; row < label_image_ptr->rows; ++row) {
@@ -47,7 +43,7 @@ void uqr::ConeSegmenter::segment_cones(const cv::Mat& depth_image){
     }
 }
 
-int uqr::ConeSegmenter::total_segments(){
+int uqr::ConeSegmenter::segments(){
 	return this->labels;
 }
 
@@ -59,7 +55,6 @@ cv::Mat uqr::ConeSegmenter::get_cluster(const cv::Mat& depth_image, int id){
     auto label_image_ptr = labeler.label_image();
 	cv::Mat masked = cv::Mat::zeros(depth_image.size(), CV_32F);
 
-	this->windowSize = std::max(this->windowSize - 2, 3);
 	cv::Mat kernel = this->depthUtil.uniform_kernal(this->windowSize, CV_8U);
 	cv::Mat dilated = cv::Mat::zeros(label_image_ptr->size(), label_image_ptr->type());
 	cv::dilate(*label_image_ptr, dilated, kernel);

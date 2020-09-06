@@ -47,28 +47,56 @@ namespace uqr {
             /// Constructor
             GroundRemover(ProjectionParams rowParams, ProjectionParams colParams, float angleStep, int windowSize);
 
-           
+            /**
+             * Preprocess and remove the ground from an image.
+             *
+             * @param depth_image Depth image to be segmented.
+             */
             void process_image(const cv::Mat& depth_image);
 
+            /**
+             * Create an image consisting of the angles between points vertically.
+             *
+             * @param depth_image Depth image to be segmented.
+             */
             cv::Mat angle_image(const cv::Mat& depth_image);
 
-            void remove_ground(const cv::Mat& depth_image, const cv::Mat& angle_image, float threshold, int kernel_size);
+            /**
+             * All in the name, remove the ground from an image.
+             *
+             * @param depth_image Depth image to be segmented.
+             * @param angle_image Angle image to be used.
+             */
+            void remove_ground(const cv::Mat& depth_image, const cv::Mat& angle_image);
 
+            /**
+             * Get the internal label image.
+             */
             cv::Mat label_image();
 
+            /**
+             * Get the greatest angle difference.
+             */
             float get_max_angle();
+            
+            /**
+             * Get the groundless image.
+             */
             cv::Mat* get_groundless();
 
         private:
             /// Sensor Angle Parameters
             ProjectionParams rowParams;
             ProjectionParams colParams;
+
+            /// Image Utilities
             Cluster labeler;
             ImageUtil depthUtil;
 
-
+            /// Images
             cv::Mat groundless;
 
+            /// Misc Variables
             float angleStep;
             float maxAngle;
             int windowSize;

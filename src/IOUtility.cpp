@@ -119,3 +119,45 @@ void uqr::cloudPublisher::publish(pcl::PointCloud<pcl::PointXYZ>& cloud, std::st
     // Publish
     this->cloudPub.publish(outputCloud);
 }
+
+uqr::ImagePublisher::ImagePublisher(std::string topic){
+    // Initialise Publisher
+    this->imgPub = this->nh.advertise<sensor_msgs::Image>(topic, 10);
+}
+
+void uqr::ImagePublisher::publish(const cv::Mat& image, float scale, std::string frame, ros::Time timeStamp){
+    cv::Mat out_img;
+    image.convertTo(out_img, 0, scale);
+    cv_bridge::CvImage out_msg;
+
+    // Set Header Information
+    out_msg.header.frame_id = frame;
+    out_msg.header.stamp = timeStamp;
+	out_msg.encoding = sensor_msgs::image_encodings::MONO8;
+    out_msg.image = out_img;
+
+    // Publish
+    this->imgPub.publish(out_msg);
+}
+
+void uqr::ImagePublisher::colour_publish(const cv::Mat& label_image, std::string frame, ros::Time timeStamp){
+    cv::Mat color_image(label_image.size(), CV_8UC3, cv::Scalar(0, 0, 0));
+	for (int row = 0; row < label_image.rows; ++row) {
+		for (int col = 0; col < label_image.cols; ++col) {
+			auto label = label_image.at<uint16_t>(row, col);
+			auto random_color = uqr::RANDOM_COLORS[label % uqr::RANDOM_COLORS.size()];
+			cv::Vec3b color = cv::Vec3b(random_color[0], random_color[1], random_color[2]);
+			color_image.at<cv::Vec3b>(row, col) = color;
+		}
+	}
+    cv_bridge::CvImage out_msg;
+
+    // Set Header Information
+    out_msg.header.frame_id = frame;
+    out_msg.header.stamp = timeStamp;
+	out_msg.encoding = sensor_msgs::image_encodings::RGB8;
+    out_msg.image = color_image;
+
+    // Publish
+    this->imgPub.publish(out_msg);
+}

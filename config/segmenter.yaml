@@ -1,11 +1,8 @@
 segmenter:
   file_path: "/home/ubuntu/data/vlp.pcd"
-  # file_path: "/home/ubuntu/data/depth.png"
-  view_image: true
+  
+  ground_angle: 10.0
+  ground_window: 7
 
-  focal_x: 400
-  focal_y: 1000
-  width: 450
-  height: 450
-  x_offset: 0
-  y_offset: -150
+  segment_angle: 10.0
+  segment_window: 7

@@ -36,9 +36,36 @@ namespace uqr {
             /// Move Operator
             ImageUtil& operator=(ImageUtil&&) = default;
 
+            /**
+             * Fill in any small gaps.
+             *
+             * @param depth_image Image to be filled.
+             * @param step Radius in which to fill.
+             * @param depth_threshold Comparative depth to stop filling at.
+             */
             cv::Mat repair_depth(const cv::Mat& depth_image, int step, float depth_threshold);
+
+            /**
+             * Generate a Savitsky-golay filter.
+             *
+             * @param window_size Window size of the filter, making this larger increases the "smoothness".
+             */
             cv::Mat get_kernel(int window_size);
+            
+            /**
+             * Smooth a depth image.
+             *
+             * @param image The image to be smoothed.
+             * @param window_size Window size of the filter, making this larger increases the "smoothness".
+             */
             cv::Mat smooth_image(const cv::Mat& image, int window_size);
+            
+            /**
+             * Get an identity kernal
+             *
+             * @param window_size Window size for uniform filter, (dimensions of matrix).
+             * @param type Kernal data type.
+             */
             cv::Mat uniform_kernal(int window_size, int type);
     };
 } // NAMESPACE uqr
