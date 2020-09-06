@@ -1,16 +1,16 @@
 /**
  * @author Riley Bowyer
- * @date 31-08-2020
+ * @date 06-09-2020
  *
  * @brief Projector library
  *  This library introduces:
- *    + Ground removal for projected depth images
+ *    + Segmenting of depth images
  *
  * @namespace uqr
  */
 
-#ifndef GROUNDREMOVAL_H
-#define GROUNDREMOVAL_H
+#ifndef CONESEGMENT_H
+#define CONESEGMENT_H
 
 /// Internal Libraries
 #include "lidar_cones_detection/ProjectionParameters.hpp"
@@ -26,52 +26,46 @@
 #include <opencv2/core/hal/interface.h>
 
 namespace uqr {
-
-    class GroundRemover{
+    class ConeSegmenter{
         public:
             /// Empty Constructor
-            GroundRemover();
+            ConeSegmenter();
 
             /// Copy Constructor
-            GroundRemover(const GroundRemover& otherRemover) = default;
+            ConeSegmenter(const ConeSegmenter& otherSegmenter) = default;
 
             /// Copy Operator
-            GroundRemover& operator=(const GroundRemover&) = default;
+            ConeSegmenter& operator=(const ConeSegmenter&) = default;
 
             /// Move Constructor
-            GroundRemover(GroundRemover&&) = default;
+            ConeSegmenter(ConeSegmenter&&) = default;
 
             /// Move Operator
-            GroundRemover& operator=(GroundRemover&&) = default;
+            ConeSegmenter& operator=(ConeSegmenter&&) = default;
 
             /// Constructor
-            GroundRemover(ProjectionParams rowParams, ProjectionParams colParams, float angleStep, int windowSize);
+            ConeSegmenter(ProjectionParams rowParams, ProjectionParams colParams, float angleStep, int windowSize);
 
            
             void process_image(const cv::Mat& depth_image);
 
-            cv::Mat angle_image(const cv::Mat& depth_image);
+            void segment_cones(const cv::Mat& depth_image);
 
-            void remove_ground(const cv::Mat& depth_image, const cv::Mat& angle_image, float threshold, int kernel_size);
-
+            int total_segments();
             cv::Mat label_image();
 
-            float get_max_angle();
-            cv::Mat* get_groundless();
-
+            cv::Mat get_cluster(const cv::Mat& depth_image, int id);
         private:
             /// Sensor Angle Parameters
             ProjectionParams rowParams;
             ProjectionParams colParams;
             Cluster labeler;
             ImageUtil depthUtil;
-
-
-            cv::Mat groundless;
+            cv::Mat col_angles;
 
             float angleStep;
-            float maxAngle;
             int windowSize;
+            int labels;
     };
 } // NAMESPACE uqr
-#endif //GROUNDREMOVAL_H
+#endif //CONESEGMENT_H

@@ -36,10 +36,10 @@ void uqr::Cluster::set_angle(const cv::Mat& angle_image){
 }
 
 void uqr::Cluster::clear_labels(){
-    this->labels = cv::Mat::zeros(this->depth_image_ptr->size(), cv::DataType<uint16_t>::type);
+    this->labels = cv::Mat::zeros(this->depth_image_ptr->size(), cv::DataType<float>::type);
 }
 
-void uqr::Cluster::label_search(uqr::PointCord start, uint16_t label){
+void uqr::Cluster::vertical_search(uqr::PointCord start, uint16_t label){
 
     std::queue<uqr::PointCord> labeling_queue;
     labeling_queue.push(start);
@@ -88,8 +88,74 @@ void uqr::Cluster::label_search(uqr::PointCord start, uint16_t label){
 
             // Calc Diff
             float diff = abs(this->get_angle(current) - this->get_angle(neighbour));
-            if (diff >= this->angleThresh) {
+            if (diff <= this->angleThresh) {
             labeling_queue.push(neighbour);
+            }
+        }
+    }
+}
+
+void uqr::Cluster::horizontal_search(uqr::PointCord start, uint16_t label){
+
+    std::queue<uqr::PointCord> labeling_queue;
+    labeling_queue.push(start);
+    
+    size_t max_queue_size = 0;
+    while (!labeling_queue.empty()){
+        max_queue_size = std::max(labeling_queue.size(), max_queue_size);
+
+        // Copy Cord
+        const PointCord current = labeling_queue.front();
+        labeling_queue.pop();
+
+        uint16_t current_label = this->get_label(current);
+
+        if (current_label > 0){
+            continue; // Already Labelled
+        }
+
+        // set the label of this point to current label
+        this->set_label(current, label);
+
+        // check the depth
+        float current_depth = this->get_depth(current);
+        if (current_depth < 0.001f) {
+            continue; // Invalid Point
+        }
+
+        for (const auto& step : this->Neighbourhood){
+            uqr::PointCord neighbour = current + step;
+            if (neighbour.r < 0 || neighbour.r >= this->labels.rows){
+                continue; // Point Out of Range
+            }
+
+            // Check Wrap-Around
+            if(neighbour.c < 0){
+                neighbour.c += this->labels.cols;
+            }
+            else if(neighbour.c >= this->labels.cols){
+                neighbour.c -= this->labels.cols;
+            }
+
+            uint16_t neigh_label = this->get_label(neighbour);
+            if (neigh_label > 0){
+                continue;// Already Labelled
+            }
+
+            // Calc Diff
+            float diff;
+            float angle_diff = this->get_angle(neighbour) - this->get_angle(current); // CHECK
+            float d1 = this->get_depth(current);
+            float d2 = this->get_depth(neighbour);
+            if(d1 > d2){
+                diff = atan2(d2*sin(angle_diff),d1-d2*cos(angle_diff));
+            }
+            else{
+                diff = atan2(d1*sin(angle_diff),d2-d1*cos(angle_diff));
+            }
+            std::cout << "Diff: " << diff << std::endl;
+            if (diff >= this->angleThresh) {
+                labeling_queue.push(neighbour);
             }
         }
     }
@@ -104,15 +170,12 @@ uint16_t uqr::Cluster::get_label(uqr::PointCord point){
 }
 
 float uqr::Cluster::get_depth(uqr::PointCord point){
-    return depth_image_ptr->at<uint16_t>(point.r, point.c);
+    return depth_image_ptr->at<float>(point.r, point.c);
 }
 
 float uqr::Cluster::get_angle(uqr::PointCord point){
-    return angle_image_ptr->at<uint16_t>(point.r, point.c);
+    return angle_image_ptr->at<float>(point.r, point.c);
 }
-
-// TODO: Implement search to return a image mask for the given label
-cv::Mat uqr::Cluster::label_mask(uint16_t label){ return cv::Mat::zeros(this->depth_image_ptr->size(), cv::DataType<uint16_t>::type);}
 
 cv::Mat* uqr::Cluster::label_image(){
     return &this->labels;

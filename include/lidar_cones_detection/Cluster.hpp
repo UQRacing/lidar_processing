@@ -67,14 +67,14 @@ namespace uqr {
             void clear_labels();
 
            
-            void label_search(PointCord start, uint16_t label);
+            void vertical_search(PointCord start, uint16_t label);
+            void horizontal_search(PointCord start, uint16_t label);
             void set_label(PointCord point, uint16_t label);
 
             uint16_t get_label(PointCord point);
             float get_depth(PointCord point);
             float get_angle(PointCord point);
 
-            cv::Mat label_mask(uint16_t label);
             cv::Mat* label_image();
     
         private:

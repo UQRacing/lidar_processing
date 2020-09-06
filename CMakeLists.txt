@@ -26,6 +26,10 @@ catkin_package(DEPENDS
   IOUtility 
   ProjectionParameters 
   Projector
+  Cluster
+  ImageUtil
+  GroundRemover
+  ConeSegmenter
 )
 
 ###########
@@ -56,8 +60,14 @@ target_link_libraries(Projector ${OpenCV_LIBRARIES} PCLWrapper ProjectionParamet
 add_library(Cluster STATIC src/Cluster.cpp)
 target_link_libraries(Cluster ${OpenCV_LIBRARIES})
 
+add_library(ImageUtil STATIC src/ImageUtil.cpp)
+target_link_libraries(ImageUtil ${OpenCV_LIBRARIES})
+
 add_library(GroundRemover STATIC src/GroundRemoval.cpp)
-target_link_libraries(GroundRemover ${OpenCV_LIBRARIES} Projector PCLWrapper ProjectionParameters Cluster)
+target_link_libraries(GroundRemover ${OpenCV_LIBRARIES} Projector PCLWrapper ProjectionParameters Cluster ImageUtil)
+
+add_library(ConeSegmenter STATIC src/ConeSegment.cpp)
+target_link_libraries(ConeSegmenter ${OpenCV_LIBRARIES} Projector PCLWrapper ProjectionParameters Cluster ImageUtil)
 
 ################
 ## Executable ##
@@ -68,4 +78,4 @@ add_executable(testing src/test.cpp)
 target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
 
 add_executable(segmentTesting src/segmentTest.cpp)
-target_link_libraries(segmentTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} GroundRemover Projector ProjectionParameters PCLWrapper IOUtility Cluster)
+target_link_libraries(segmentTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} GroundRemover ConeSegmenter Projector ProjectionParameters PCLWrapper IOUtility Cluster)
