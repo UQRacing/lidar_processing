@@ -6,7 +6,7 @@
  *  This library introduces:
  *    + A custom data type that has implicit conversions between all PointCloud data types used in this project
  *      from other libraries
- *    + Simplified pcl functions
+ *    + Simplified use-case forpcl functions
  *
  * @namespace uqr
  *  @class PointCloud cross-library PointCloud adaptor
@@ -66,18 +66,19 @@ namespace uqr {
         /// pcl::PointCloud<pcl::PointXYZ> Constructor
         PointCloud(const pcl::PointCloud<pcl::PointXYZ> &otherPointCloud);
 
+        /// pcl::PointCloud<pcl::PointXYZ>::Ptr Constructor
         PointCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr otherPointCloud);
 
-        /// Implicit Conversion to sensor_msgs::PointCloud2
+        /// Implicit Conversion to sensor_msgs::PointCloud2::Ptr
         operator sensor_msgs::PointCloud2::Ptr() const;
 
-        /// Implicit Conversion to pcl::PCLPointCloud2
+        /// Implicit Conversion to pcl::PCLPointCloud2::Ptr
         operator pcl::PCLPointCloud2::Ptr() const;
 
-        /// Implicit Conversion to pcl::PointCloud<pcl::PointXYZ>
+        /// Implicit Conversion to pcl::PointCloud<pcl::PointXYZ>::Ptr
         operator pcl::PointCloud<pcl::PointXYZ>::Ptr() const;
 
-        /// Destructor
+        /// Default destructor
         ~PointCloud() = default;
 
         using Ptr = boost::shared_ptr<::uqr::PointCloud>;
@@ -86,18 +87,18 @@ namespace uqr {
     private:
         // Stored cloud
         pcl::PointCloud<pcl::PointXYZ>::Ptr storedCloud = nullptr;
+
+        // Stored ros header
         std_msgs::Header header;
 
     public:
         /**
-         * Voxelise an input cloud.
-         *
+         * Voxelise the cloud.
+         * 
          * A wrapper for the PCL voxelisation functions to
          * produce a uniformally voxelised pointcloud.
-         *
-         * @param inputCloud Pointer to the desired input cloud. This data will be voxelised.
-         * @param outputCloud Pointer to the desired output cloud. The voxelised cloud will be saved here.
-         * @param voxel_size Size in metres of the desired voxels.
+         * 
+         * @param voxel_size    Size in metres of the desired voxels.
          */
         void voxelise(const float voxel_size);
 
@@ -107,12 +108,10 @@ namespace uqr {
          * A wrapper for the PCL pass-through filter functions to
          * produce a sectioned pointcloud.
          *
-         * @param inputCloud Pointer to the desired input cloud. This data will be filtered.
-         * @param outputCloud Pointer to the desired output cloud. The voxelised cloud will be saved here.
-         * @param field_name The input field to be evaluated.
-         * @param lower_limit The lower bound of the filter.
-         * @param upper_limit The upper bound of the filter.
-         * @param invert Whether or not to invert the selected points.
+         * @param field_name    The input field to be evaluated.
+         * @param lower_limit   The lower bound of the filter.
+         * @param upper_limit   The upper bound of the filter.
+         * @param invert        Whether or not to invert the selected points.
          */
         void pass_through_filter(const std::string &field_name, const double lower_limit,
                                  const double upper_limit, const bool invert);
@@ -123,13 +122,12 @@ namespace uqr {
          * A wrapper for the PCL radius-outlier filter functions to
          * produce a reduced pointcloud.
          *
-         * @param inputCloud Pointer to the desired input cloud. This data will be filtered.
-         * @param outputCloud Pointer to the desired output cloud. The voxelised cloud will be saved here.
-         * @param radius The radius of the sphere in which to look for neighbours.
-         * @param neighbours The minimum number of neighbours for a point to be kept.
+         * @param radius        The radius of the sphere in which to look for neighbours.
+         * @param neighbours    The minimum number of neighbours for a point to be kept.
          */
         void radius_outlier_removal(const double radius, const double neighbours);
 
+// Does not modify stored cloud, hence removed
 //    /**
 //     * Sample Consensus Segmentation.
 //     *
@@ -153,10 +151,8 @@ namespace uqr {
          * A wrapper for the PCL index removal to
          * remove the specified indicies from a cloud.
          *
-         * @param inputCloud Pointer to the desired input cloud. This data will be subtracted.
-         * @param outputCloud Pointer to the desired output cloud. The voxelised cloud will be saved here.
-         * @param subtraction Pointer to the desired indicies.
-         * @param invert Whether or not to invert the selected points.
+         * @param subtraction   Pointer to the desired indicies.
+         * @param invert        Whether or not to invert the selected points.
          */
         void subtract_indices(const pcl::PointIndices::Ptr &subtraction, const bool invert);
 
@@ -166,12 +162,10 @@ namespace uqr {
          * A wrapper for the PCL filter condition to
          * filter a cloud based on user defined conditions.
          * Sample condition:
-         * pcl::ConditionAnd<pcl::PointXYZ>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZ> ());
-         * range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::GT, 0.0)));
-         * range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::LT, 0.8)));
+         *  pcl::ConditionAnd<pcl::PointXYZ>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZ> ());
+         *  range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::GT, 0.0)));
+         *  range_cond->addComparison(pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> ("z", pcl::ComparisonOps::LT, 0.8)));
          *
-         * @param inputCloud Pointer to the desired input cloud. This data will be subtracted.
-         * @param outputCloud Pointer to the desired output cloud. The voxelised cloud will be saved here.
          * @param condition The Condition object used for filtering.
          */
         void conditional_filter(pcl::ConditionAnd<pcl::PointXYZ>::Ptr condition);

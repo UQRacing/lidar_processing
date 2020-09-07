@@ -20,18 +20,21 @@ uqr::PointCloud::PointCloud(const sensor_msgs::PointCloud2& otherPointCloud) {
     this->header = otherPointCloud.header;
 }
 
+// pcl::PCLPointCloud2 Class contructor
 uqr::PointCloud::PointCloud(const pcl::PCLPointCloud2& otherPointCloud) {
     pcl::fromPCLPointCloud2(otherPointCloud, *this->storedCloud);
     this->header.stamp = ros::Time(otherPointCloud.header.stamp);
     this->header.frame_id = otherPointCloud.header.frame_id;
 }
 
+// pcl::PointCloud<pcl::PointXYZ> Class Constructor
 uqr::PointCloud::PointCloud(const pcl::PointCloud<pcl::PointXYZ>& otherPointCloud) {
     this->storedCloud.reset(new pcl::PointCloud<pcl::PointXYZ>(otherPointCloud));
     this->header.stamp = ros::Time::now();
     this->header.frame_id = "map";
 }
 
+// pcl::PointCloud<pcl::PointXYZ>::Ptr Class Constructor
 uqr::PointCloud::PointCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr otherPointCloud) {
     // Reset All Clouds and Assign Input to Corresponding Type
     this->storedCloud = otherPointCloud;  // MUST BE COPIED TO INCREMENT OWNER COUNT
@@ -60,6 +63,11 @@ uqr::PointCloud::operator pcl::PointCloud<pcl::PointXYZ>::Ptr() const {
     return this->storedCloud;
 }
 
+/**
+ * Voxelise the cloud
+ * 
+ * @param voxel_size    Size in metres of the desired voxels. 
+ */
 void uqr::PointCloud::voxelise(const float voxel_size) {
     // Configure Filter and Input
     pcl::VoxelGrid<pcl::PointXYZ> filter;
@@ -68,11 +76,18 @@ void uqr::PointCloud::voxelise(const float voxel_size) {
     // Configure Parameters
     filter.setLeafSize(voxel_size, voxel_size, voxel_size);
 
-    // Filter
-    // filter.filter((pcl::PCLPointCloud2&) outputCloud);  // FIXME: figure out this cast
+    // Replace stored cloud with filtered cloud
     filter.filter(*this->storedCloud);
 }
 
+/**
+ * Perform pass-through filtering.
+ * 
+ * @param field_name    The input field to be evaluated.
+ * @param lower_limit   The lower bound of the filter.
+ * @param upper_limit   The upper bound of the filter.
+ * @param invert        Whether or not to invert the selected points.
+ */
 void uqr::PointCloud::pass_through_filter(const std::string&  field_name, const double lower_limit,
                                           const double upper_limit, const bool invert) {
 
@@ -85,10 +100,16 @@ void uqr::PointCloud::pass_through_filter(const std::string&  field_name, const 
     filter.setFilterLimits(lower_limit, upper_limit);
     filter.setFilterLimitsNegative(invert);
 
-    // Filter
+    // Replace stored cloud with filted cloud
     filter.filter(*this->storedCloud);
 }
 
+/**
+ * Perform radius outlier filtering.
+ * 
+ * @param radius        The radius of the sphere in which to look for neighbours.
+ * @param neighbours    The minimum number of neighbours for a point to be kept.
+ */
 void uqr::PointCloud::radius_outlier_removal(const double radius, const double neighbours) {
 
     // Configure Filter and Input
@@ -99,10 +120,11 @@ void uqr::PointCloud::radius_outlier_removal(const double radius, const double n
     filter.setRadiusSearch(radius);
     filter.setMinNeighborsInRadius(neighbours);
 
-    // Filter
+    // Replace stored cloud with filtered cloud
     filter.filter(*this->storedCloud);
 }
 
+// Does not modify stored cloud, hence removed
 //void uqr::PointCloud::sac_segmentation(const uqr::PointCloud::ConstPtr& inputCloud, pcl::ModelCoefficients &outputCoeff, pcl::PointIndices &outputIndex,
 //                           const int model, const int method, const double threshold, const bool optimize_coeff) {
 //
@@ -123,6 +145,12 @@ void uqr::PointCloud::radius_outlier_removal(const double radius, const double n
 //    segment.segment(outputIndex, outputCoeff);
 //}
 
+/**
+ * Index Subtraction.
+ * 
+ * @param subtraction   Pointer to the desired indicies.
+ * @param invert        Whether or not to invert the selected points.
+ */
 void uqr::PointCloud::subtract_indices(const pcl::PointIndices::Ptr& subtraction, const bool invert) {
 
     // Configure Filter and Input
@@ -133,11 +161,15 @@ void uqr::PointCloud::subtract_indices(const pcl::PointIndices::Ptr& subtraction
     // Configure Parameters
     extract.setNegative(invert);
 
-    // Filter
+    // Replace stored cloud with filtered cloud
     extract.filter(*this->storedCloud);
 }
 
-
+/**
+ * Input Condition Filtering.
+ * 
+ * @param condition The Condition object used for filtering.
+ */
 void uqr::PointCloud::conditional_filter(pcl::ConditionAnd<pcl::PointXYZ>::Ptr condition) {
     // Configure Segmenter and Input
     pcl::ConditionalRemoval<pcl::PointXYZ> filter;
@@ -146,6 +178,6 @@ void uqr::PointCloud::conditional_filter(pcl::ConditionAnd<pcl::PointXYZ>::Ptr c
     // Configure Parameters
     filter.setCondition(condition);
 
-    // Filter
+    // Replace stored cloud with filtered cloud
     filter.filter(*this->storedCloud);
 }
