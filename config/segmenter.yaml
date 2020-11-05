@@ -1,8 +1,8 @@
 segmenter:
   file_path: "/home/ubuntu/data/vlp.pcd"
   
-  ground_angle: 10.0
-  ground_window: 7
+  ground_angle: 1.0
+  ground_window: 5
 
-  segment_angle: 10
-  segment_window: 7
+  segment_angle: 1.0
+  segment_window: 5

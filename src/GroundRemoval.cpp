@@ -19,14 +19,14 @@ uqr::GroundRemover::GroundRemover(ProjectionParams rowParams, ProjectionParams c
 }
 
 void uqr::GroundRemover::process_image(const cv::Mat& depth_image){
-    const cv::Mat repaired_depth = this->depthUtil.repair_depth(depth_image, 7, 1.0f);
-    const cv::Mat angle_image = this->angle_image(repaired_depth);
-    const cv::Mat smoothed_image = this->depthUtil.smooth_image(angle_image, this->windowSize);
+    // const cv::Mat repaired_depth = this->depthUtil.repair_depth(depth_image, 7, 1.0f);
+    const cv::Mat angle_image = this->angle_image(depth_image);
+    // const cv::Mat smoothed_image = this->depthUtil.smooth_image(angle_image, this->windowSize);
 
     this->labeler.set_depth(depth_image);
-    this->labeler.set_angle(smoothed_image);
+    this->labeler.set_angle(angle_image);
 
-    this->remove_ground(depth_image, smoothed_image);
+    this->remove_ground(depth_image, angle_image);
 }
 
 cv::Mat uqr::GroundRemover::angle_image(const cv::Mat& depth_image) {
