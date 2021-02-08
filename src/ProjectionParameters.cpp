@@ -14,18 +14,18 @@ uqr::ProjectionParams::ProjectionParams(){
     this->max_angle = 0;
 }
 
-uqr::ProjectionParams::ProjectionParams(float min_angle, float max_angle, float step){
-    this->num_beams = floor((max_angle - min_angle) / step);
-    this->step = step;
-    this->min_angle = min_angle;
-    this->max_angle = max_angle;
-}
-
-uqr::ProjectionParams::ProjectionParams(float min_angle, float max_angle, int num_beams){
-    this->num_beams = num_beams;
-    this->step = step = (max_angle - min_angle) / num_beams;
-    this->min_angle = min_angle;
-    this->max_angle = max_angle;
+uqr::ProjectionParams::ProjectionParams(float min_angle, float max_angle, float step, bool beamCount){
+    if(beamCount){
+      this->num_beams = num_beams;
+      this->step = step = (max_angle - min_angle) / num_beams;
+      this->min_angle = min_angle;
+      this->max_angle = max_angle;
+    } else {
+      this->num_beams = floor((max_angle - min_angle) / step);
+      this->step = step;
+      this->min_angle = min_angle;
+      this->max_angle = max_angle;
+    }
 }
 
 void uqr::ProjectionParams::fill_angles(){

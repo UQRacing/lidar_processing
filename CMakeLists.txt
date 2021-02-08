@@ -75,7 +75,25 @@ target_link_libraries(ConeSegmenter ${OpenCV_LIBRARIES} Projector PCLWrapper Pro
 
 # FIXME: delete me; this is for testing purposed
 add_executable(testing src/test.cpp)
-target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} PCLWrapper IOUtility)
+target_link_libraries(testing
+                      ${catkin_LIBRARIES}
+                      ${PCL_LIBRARIES}
+                      PCLWrapper
+                      IOUtility
+)
 
-add_executable(segmentTesting src/segmentTest.cpp)
-target_link_libraries(segmentTesting ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} GroundRemover ConeSegmenter Projector ProjectionParameters PCLWrapper IOUtility Cluster)
+add_executable(segmentTesting
+               src/segmentTest.cpp
+)
+target_link_libraries(segmentTesting
+                      ${catkin_LIBRARIES}
+                      ${PCL_LIBRARIES}
+                      ${OpenCV_LIBRARIES}
+                      GroundRemover
+                      ConeSegmenter
+                      Projector
+                      ProjectionParameters
+                      PCLWrapper
+                      IOUtility
+                      Cluster
+)

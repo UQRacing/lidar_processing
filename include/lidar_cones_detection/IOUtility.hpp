@@ -131,6 +131,9 @@ namespace uqr {
             /// Constructor with Topic
             ImagePublisher(std::string topic);
             
+            /// Empty Constructor
+            ImagePublisher() : ImagePublisher("/image"){};
+            
             // Publish Methods
             /**
              * Publish a cv::Mat as monochrome.

@@ -29,7 +29,7 @@ namespace uqr {
     class ConeSegmenter{
         public:
             /// Empty Constructor
-            ConeSegmenter();
+            ConeSegmenter(){};
 
             /// Copy Constructor
             ConeSegmenter(const ConeSegmenter& otherSegmenter) = default;

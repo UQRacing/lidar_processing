@@ -30,7 +30,7 @@ namespace uqr {
     class GroundRemover{
         public:
             /// Empty Constructor
-            GroundRemover();
+            GroundRemover(){};
 
             /// Copy Constructor
             GroundRemover(const GroundRemover& otherRemover) = default;

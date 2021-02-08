@@ -36,11 +36,8 @@ namespace uqr {
             /// Move Operator
             ProjectionParams& operator=(ProjectionParams&&) = default;
 
-            /// Step Constructor
-            ProjectionParams(float min_angle, float max_angle, float step);
-
-            /// Beam Num Constructor
-            ProjectionParams(float min_angle, float max_angle, int num_beams);
+            /// Constructor
+            ProjectionParams(float min_angle, float max_angle, float step, bool beamCount = false);
 
             /**
             * Populate Angle Vector.
