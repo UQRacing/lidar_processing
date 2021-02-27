@@ -26,21 +26,27 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-# i commented these out because I don't know why they are needed? Please explain sir!?
-#link_directories(${pcl_ros_LIBRARY_DIRS})
-#add_definitions(${pcl_ros_DEFINITIONS})
+add_library(UQRPointCloud STATIC 
+            src/UQRPointCloud.cpp)
+target_link_libraries(UQRPointCloud 
+                      ${pcl_ros_LIBRARIES})
 
-# gotta link those pcl_ros_LIBRARIES or the whole thing breaks
-# also the wrapper is being compiled as a library not an executable for obvious reasons
-add_library(UQRPointCloud STATIC src/UQRPointCloud.cpp)
-target_link_libraries(UQRPointCloud ${pcl_ros_LIBRARIES})
 
-#add_library(IOUtility STATIC src/IOUtility.cpp)
-#target_link_libraries(IOUtility ${pcl_ros_LIBRARIES} UQRPointCloud)
+add_library(IOUtility STATIC 
+            src/IOUtility.cpp)
+          
+target_link_libraries(IOUtility 
+                      ${pcl_ros_LIBRARIES} 
+                      UQRPointCloud)
+
+
+add_executable(binDetection
+               src/binDetectionNode.cpp
+               src/binDetector.cpp)
+
+target_link_libraries(binDetection 
+                      ${pcl_ros_LIBRARIES}
+                      UQRPointCloud)
 
 #add_executable(cloudFilterSample src/cloudFilter.cpp)
 #target_link_libraries(cloudFilterSample ${catkin_LIBRARIES})
-
-# FIXME: delete me; this is for testing purposed
-add_executable(testing src/test.cpp)
-target_link_libraries(testing ${catkin_LIBRARIES} ${PCL_LIBRARIES} UQRPointCloud)

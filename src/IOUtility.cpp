@@ -51,10 +51,10 @@ void uqr::write_cloud(const std::string file_path, uqr::PointCloud& input_cloud)
 
     // Call the appropriate write function.
     if(extension == "pcd" || extension == "PCD"){
-        pcl::io::savePCDFileBinary(file_path, (pcl::PointCloud<pcl::PointXYZ>) input_cloud); // Write File
+        pcl::io::savePCDFileBinary(file_path, *pcl::PointCloud<pcl::PointXYZ>::Ptr(input_cloud)); // Write File
     }
     else if(extension == "ply" || extension == "PLY"){
-        pcl::io::savePLYFileBinary(file_path, (pcl::PointCloud<pcl::PointXYZ>) input_cloud); // Write File
+        pcl::io::savePLYFileBinary(file_path, *pcl::PointCloud<pcl::PointXYZ>::Ptr(input_cloud)); // Write File
     }
     else{
         std::cout << "Couldn't write file at " << file_path << ", File Type Not Supported." << std::endl;
@@ -67,7 +67,7 @@ uqr::cloudPublisher::cloudPublisher(std::string topic){
 }
 
 void uqr::cloudPublisher::publish(uqr::PointCloud& cloud, std::string frame, ros::Time timeStamp){
-    sensor_msgs::PointCloud2 outputCloud((sensor_msgs::PointCloud2) cloud);
+    sensor_msgs::PointCloud2 outputCloud(*sensor_msgs::PointCloud2::Ptr(cloud));
 
     // Set Header Information
     outputCloud.header.frame_id = frame;
@@ -89,7 +89,7 @@ void uqr::cloudPublisher::publish(sensor_msgs::PointCloud2& cloud, std::string f
 void uqr::cloudPublisher::publish(pcl::PCLPointCloud2& cloud, std::string frame, ros::Time timeStamp){
     // Abuse the fact we've defined conversions in uqr::PointCloud
     uqr::PointCloud uqrCloud(cloud);
-    sensor_msgs::PointCloud2 outputCloud((sensor_msgs::PointCloud2) uqrCloud);
+    sensor_msgs::PointCloud2 outputCloud(*sensor_msgs::PointCloud2::Ptr(uqrCloud));
 
     // Set Header Information
     outputCloud.header.frame_id = frame;
@@ -102,7 +102,7 @@ void uqr::cloudPublisher::publish(pcl::PCLPointCloud2& cloud, std::string frame,
 void uqr::cloudPublisher::publish(pcl::PointCloud<pcl::PointXYZ>& cloud, std::string frame, ros::Time timeStamp){
     // Abuse the fact we've defined conversions in uqr::PointCloud
     uqr::PointCloud uqrCloud(cloud);
-    sensor_msgs::PointCloud2 outputCloud((sensor_msgs::PointCloud2) uqrCloud);
+    sensor_msgs::PointCloud2 outputCloud(*sensor_msgs::PointCloud2::Ptr(uqrCloud));
 
     // Set Header Information
     outputCloud.header.frame_id = frame;

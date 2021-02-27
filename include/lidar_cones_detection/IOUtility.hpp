@@ -13,7 +13,7 @@
 #ifndef LIDAR_CONES_DETECTION_IOUTILITY_H
 #define LIDAR_CONES_DETECTION_IOUTILITY_H
 
-#include "lidar_cones_detection/PCLWrapper.hpp"
+#include "lidar_cones_detection/UQRPointCloud.hpp"
 #include <pcl/io/pcd_io.h>
 #include <pcl/io/ply_io.h>
 
