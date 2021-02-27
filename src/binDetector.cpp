@@ -9,31 +9,37 @@ void BinDetector::Bin::add_point(pcl::PointXYZ point){
   if(point.z > maxPoint.z || (maxPoint.x == 0 &&  maxPoint.y == 0 && maxPoint.z == 0)){
     maxPoint = point;
   }
+  if(point.z < minPoint.z || (minPoint.x == 0 &&  minPoint.y == 0 && minPoint.z == 0)){
+    minPoint = point;
+  }
 }
 
 void BinDetector::Bin::reset(){
   points.clear();
   numPoints = 0;
   maxPoint = pcl::PointXYZ();
+  minPoint = pcl::PointXYZ();
   
   obstacleHeight  = 0;
 }
 
 BinDetector::BinDetector(){
+  this->useNeighbourError = false;
+  
   double groundLevel = -0.4;
   this->maxHeight = 1 + groundLevel;
   this->minPoints = 1;
-  this->heightThreshold = 0.06;
+  this->heightThreshold = 0.2;
   this->correspondenceThreshold = 0.2;
   
   this->binCentreX = 15;
   this->binCentreY = 0;
-  this->binWidth = 30;
-  this->binHeight = 30;
+  this->binWidth = 50;
+  this->binHeight = 50;
   
   // (int) round(width/RES)
-  this->binImgWidth = (int) round(this->binWidth/0.3);
-  this->binImgHeight = (int) round(this->binHeight/0.3); 
+  this->binImgWidth = (int) round(this->binWidth/0.5);
+  this->binImgHeight = (int) round(this->binHeight/0.5); 
   
   this->binImage.resize(this->binImgWidth * this->binImgHeight);
   for (auto &bin: this->binImage) bin.reset();
@@ -64,24 +70,28 @@ std::vector<BinDetector::Bin> BinDetector::update(pcl::PointCloud<pcl::PointXYZ>
   for(int index=0; index < this->binImgWidth*this->binImgHeight; index += 1){
     BinDetector::Bin& bin = this->binImage[index];
 
-    // if(bin.numPoints < this->minPoints) continue;
+    if(bin.numPoints < this->minPoints) continue;
+    if(this->useNeighbourError){      
+      double diffCubed = 0.0;
+      int totalPoints = 0;
 
-    double diffCubed = 0.0;
-    int totalPoints = 0;
-
-    for(int neighbourX=-this->binImgHeight; neighbourX <= this->binImgHeight; neighbourX+=this->binImgHeight){
-      for(int neighbourY=-1; neighbourY <= 1; neighbourY+=1){
-        int neighbourIndex = index + neighbourX + neighbourY;
-        if(neighbourIndex == index || neighbourIndex < 0 || neighbourIndex > this->binImgWidth*this->binImgHeight) continue;
-        BinDetector::Bin& neighbourBin = this->binImage[neighbourIndex];
-        double diff = bin.maxPoint.z - neighbourBin.maxPoint.z;
-        diffCubed += (diff*diff*diff)*neighbourBin.numPoints;
-        totalPoints += neighbourBin.numPoints;
+      for(int neighbourX=-this->binImgHeight; neighbourX <= this->binImgHeight; neighbourX+=this->binImgHeight){
+        for(int neighbourY=-1; neighbourY <= 1; neighbourY+=1){
+          int neighbourIndex = index + neighbourX + neighbourY;
+          if(neighbourIndex == index || neighbourIndex < 0 || neighbourIndex > this->binImgWidth*this->binImgHeight) continue;
+          BinDetector::Bin& neighbourBin = this->binImage[neighbourIndex];
+          double diff = bin.maxPoint.z - neighbourBin.maxPoint.z;
+          diffCubed += (diff*diff*diff)*neighbourBin.numPoints;
+          totalPoints += neighbourBin.numPoints;
+        }
+      }
+      if(totalPoints > this->minPoints){
+        bin.obstacleHeight = powf(diffCubed/totalPoints,1.0/3.0);
+        if(fabs(bin.obstacleHeight) > this->heightThreshold) obstacleVec.push_back(index);
       }
     }
-    if(totalPoints > this->minPoints){
-      bin.obstacleHeight = powf(diffCubed/totalPoints,1.0/3.0);
-      if(fabs(bin.obstacleHeight) > this->heightThreshold) obstacleVec.push_back(index);
+    else{
+      if(fabs(bin.maxPoint.z - bin.minPoint.z) > this->heightThreshold) obstacleVec.push_back(index);
     }
   }
   

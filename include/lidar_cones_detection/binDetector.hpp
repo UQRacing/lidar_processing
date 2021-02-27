@@ -18,6 +18,7 @@ class BinDetector {
   struct Bin{
     std::vector<pcl::PointXYZ> points;
     pcl::PointXYZ maxPoint;
+    pcl::PointXYZ minPoint;
 
     double obstacleHeight;
     double minHeight;
@@ -57,6 +58,8 @@ class BinDetector {
     ConeType get_bin_colour(const int xBin,  const int yBin);
     
     std::vector<Bin> binImage;
+    
+    bool useNeighbourError;
     
     double maxHeight;
     int minPoints;
