@@ -65,8 +65,6 @@ class PlaneDetector {
     
     std::vector<boost::shared_ptr<Bin>> binImage;
     
-    // int polynomialOrder;
-    // Eigen::MatrixXd polynomial;
     Eigen::Vector3d plane;
     
     double maxHeight;

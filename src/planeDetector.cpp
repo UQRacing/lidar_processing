@@ -30,7 +30,6 @@ PlaneDetector::PlaneDetector(){
   
   this->heightThreshold = 0.2;
   this->correspondenceThreshold = 0.2;
-  // this->polynomialOrder = 2;
   
   this->binCentreX = 15;
   this->binCentreY = 0;
@@ -42,8 +41,6 @@ PlaneDetector::PlaneDetector(){
   this->binImgHeight = (int) round(this->binHeight/0.5); 
   
   this->binImage.resize(this->binImgWidth * this->binImgHeight);
-  // this->polynomial.resize(this->polynomialOrder, this->polynomialOrder);
-  // this->polynomial.setZero();
   this->plane.setZero();
   
   for (auto &bin: this->binImage){
@@ -53,18 +50,6 @@ PlaneDetector::PlaneDetector(){
 }
 
 double PlaneDetector::get_height(double x, double y){
-  // double height = 0.0;
-
-  // double xTerm = 1.0;
-  // for (int i = 0; i < polynomial.cols(); i++){
-  //   double yTerm = 1.0;
-  //   for (int j = 0; j < polynomial.rows(); j++){
-  //     height += this->polynomial(j, i)*xTerm*yTerm;
-  //     yTerm *= y - this->binCentreY;
-  //   }
-  //   xTerm *= x - this->binCentreX;
-  // }
-  
   return this->plane(0)*(x-this->binCentreX) + this->plane(1)*y + this->plane(2);
 }
 
@@ -80,8 +65,7 @@ int PlaneDetector::point_to_index(pcl::PointXYZ& point){
 
 std::vector<boost::shared_ptr<PlaneDetector::Bin>> PlaneDetector::update(pcl::PointCloud<pcl::PointXYZ>::Ptr pointCloud){
   for (auto &bin: this->binImage) bin->reset();
-  // polynomial.setZero();
-  
+
   // Sort Points
   std::vector<int> lsPointsBins;
   for (auto & point : pointCloud->points) {
@@ -92,24 +76,6 @@ std::vector<boost::shared_ptr<PlaneDetector::Bin>> PlaneDetector::update(pcl::Po
     if(this->binImage[binIndex]->numPoints == (this->minPoints-1)) lsPointsBins.push_back(binIndex); 
     this->binImage[binIndex]->add_point(point);
   }
-  
-  // // Construct 'A' Matrix
-  // Eigen::MatrixXd A(lsPointsBins.size(), this->polynomial.cols()*this->polynomial.rows());
-  
-  // for (int i = 0; i < lsPointsBins.size(); i++){
-  //   Eigen::VectorXd row(this->polynomial.cols()*this->polynomial.rows());
-  //   int j = 0;
-  //   double xTerm = 1.0;
-  //   for (int x = 0; x < polynomial.cols(); x++){
-  //     double yTerm = 1.0;
-  //     for (int y = 0; y<polynomial.rows(); y++){
-  //       row(j++) = xTerm*yTerm;
-  //       yTerm *= this->binImage[lsPointsBins[i]]->minPoint.y - this->binCentreY;
-  //     }
-  //     xTerm *= this->binImage[lsPointsBins[i]]->minPoint.x - this->binCentreX;
-  //   }
-  //   A.row(i) = row.transpose();
-  // }
   
   // Construct 'A' Matrix
   Eigen::MatrixXd A(lsPointsBins.size(), 3);
@@ -124,12 +90,6 @@ std::vector<boost::shared_ptr<PlaneDetector::Bin>> PlaneDetector::update(pcl::Po
   Eigen::MatrixXd AT = A.transpose();
 
   this->plane = (AT*A).ldlt().solve(AT*b);
-  
-  // for (int i = 0; i < polynomial.cols(); i++){
-  //   for (int j = 0; j < polynomial.rows(); j++){
-  //     polynomial(j, i) = x[j++];
-  //   }
-  // }
   
   std::vector<boost::shared_ptr<PlaneDetector::Bin>> outputBins;
   

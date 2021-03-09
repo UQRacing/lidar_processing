@@ -5,7 +5,6 @@
 PlaneDetectionNode::PlaneDetectionNode() {
     this->pointcloud_sub  = this->node.subscribe<sensor_msgs::PointCloud2>("/livox/lidar", 100, &PlaneDetectionNode::pointcloud_cb, this);
     this->observation_pub = node.advertise<sensor_msgs::PointCloud2>("output_cloud", 100);
-    // this->detector = PlaneDetector();
 }
 
 void PlaneDetectionNode::pointcloud_cb(const sensor_msgs::PointCloud2::ConstPtr& scan) {
@@ -15,8 +14,7 @@ void PlaneDetectionNode::pointcloud_cb(const sensor_msgs::PointCloud2::ConstPtr&
   auto coneBins = this->detector.update(inputCloud);
   pcl::PointCloud<pcl::PointXYZ>::Ptr processedCloud(new pcl::PointCloud<pcl::PointXYZ>);
   for(auto &cone: coneBins){
-    if(cone->numPoints > 0)
-      processedCloud->points.push_back(cone->maxPoint);
+    processedCloud->points.push_back(cone->maxPoint);
   }
   
   sensor_msgs::PointCloud2 outputCloud;
