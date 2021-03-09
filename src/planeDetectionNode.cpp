@@ -1,21 +1,22 @@
 
 // Main Include
-#include "lidar_cones_detection/binDetectionNode.hpp"
+#include "lidar_cones_detection/planeDetectionNode.hpp"
 
-BinDetectionNode::BinDetectionNode() {
-    this->pointcloud_sub  = this->node.subscribe<sensor_msgs::PointCloud2>("/livox/lidar", 100, &BinDetectionNode::pointcloud_cb, this);
+PlaneDetectionNode::PlaneDetectionNode() {
+    this->pointcloud_sub  = this->node.subscribe<sensor_msgs::PointCloud2>("/livox/lidar", 100, &PlaneDetectionNode::pointcloud_cb, this);
     this->observation_pub = node.advertise<sensor_msgs::PointCloud2>("output_cloud", 100);
-    // this->detector = BinDetector();
+    // this->detector = PlaneDetector();
 }
 
-void BinDetectionNode::pointcloud_cb(const sensor_msgs::PointCloud2::ConstPtr& scan) {
+void PlaneDetectionNode::pointcloud_cb(const sensor_msgs::PointCloud2::ConstPtr& scan) {
   pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*scan, *inputCloud);
   
   auto coneBins = this->detector.update(inputCloud);
   pcl::PointCloud<pcl::PointXYZ>::Ptr processedCloud(new pcl::PointCloud<pcl::PointXYZ>);
   for(auto &cone: coneBins){
-    processedCloud->points.push_back(cone.maxPoint);
+    if(cone->numPoints > 0)
+      processedCloud->points.push_back(cone->maxPoint);
   }
   
   sensor_msgs::PointCloud2 outputCloud;
@@ -27,7 +28,7 @@ void BinDetectionNode::pointcloud_cb(const sensor_msgs::PointCloud2::ConstPtr& s
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "LidarConeDetector");
-    BinDetectionNode detectionNode;
+    PlaneDetectionNode detectionNode;
     ros::spin();
     return 0;
 }

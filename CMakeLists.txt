@@ -40,11 +40,11 @@ target_link_libraries(IOUtility
                       UQRPointCloud)
 
 
-add_executable(binDetection
-               src/binDetectionNode.cpp
-               src/binDetector.cpp)
+add_executable(planeDetection
+               src/planeDetectionNode.cpp
+               src/planeDetector.cpp)
 
-target_link_libraries(binDetection 
+target_link_libraries(planeDetection 
                       ${pcl_ros_LIBRARIES}
                       UQRPointCloud)
 
