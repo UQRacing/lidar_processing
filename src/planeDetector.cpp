@@ -1,7 +1,23 @@
+/*******************************************************************************************************************//**
+ *  @file    planeDetector.cpp
+ *  @brief   Provides an interface for a plane based cone segmentation algorithm.
+ *
+ *  @author  Riley Bowyer (riley.d.bowyer@gmail.com)
+ *  @date    March 2021
+ *
+***********************************************************************************************************************/
+
 
 // Main Include
 #include "lidar_cones_detection/planeDetector.hpp"
 
+
+/**
+ * @brief Add a point to the bin. Recalculates parameters and adds
+ *        the point to the stored vector.
+ * @param point The point to add to the bin.
+ *
+ */
 void PlaneDetector::Bin::add_point(pcl::PointXYZ point){
   points.push_back(point);
   numPoints += 1;
@@ -14,6 +30,12 @@ void PlaneDetector::Bin::add_point(pcl::PointXYZ point){
   }
 }
 
+
+/**
+ * @brief Reset the bin. Clears all calculated parameters and
+ *        clears the stored point vector.
+ *
+ */
 void PlaneDetector::Bin::reset(){
   points.clear();
   numPoints = 0;
@@ -23,6 +45,11 @@ void PlaneDetector::Bin::reset(){
   obstacleHeight  = 0;
 }
 
+
+/**
+ * @brief Default Constructor.
+ *
+ */
 PlaneDetector::PlaneDetector(){
   
   this->maxHeight = 1;
@@ -49,10 +76,26 @@ PlaneDetector::PlaneDetector(){
   }  
 }
 
+
+/**
+ * @brief Get the height of the internally stored plane
+ *        at the provided coordinate.
+ * @param x The x-coordinate
+ * @param y The y-coordinate
+ * @return The z-coordinate of the plane
+ *
+ */
 double PlaneDetector::get_height(double x, double y){
   return this->plane(0)*(x-this->binCentreX) + this->plane(1)*y + this->plane(2);
 }
 
+
+/**
+ * @brief Converts an x,y,z coordinate to a bin index.
+ * @param point The point to get an index for
+ * @return The bin index
+ *
+ */
 int PlaneDetector::point_to_index(pcl::PointXYZ& point){
   int xBin = (int) round(this->binImgHeight*(point.x+this->binHeight/2)/this->binHeight);
   int yBin = (int) round(this->binImgWidth*(point.y+this->binWidth/2)/this->binWidth);
@@ -63,6 +106,14 @@ int PlaneDetector::point_to_index(pcl::PointXYZ& point){
   return bindex;
 }
 
+
+/**
+ * @brief Main update function. Sorts the provided pointcloud into bins before
+ *        returning a vector of identified cones.
+ * @param pointCloud The pointcloud to sort and identify cones in.
+ * @returns Vector of bins containing identified cone.
+ *
+ */
 std::vector<boost::shared_ptr<PlaneDetector::Bin>> PlaneDetector::update(pcl::PointCloud<pcl::PointXYZ>::Ptr pointCloud){
   for (auto &bin: this->binImage) bin->reset();
 
