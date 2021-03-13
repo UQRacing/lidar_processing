@@ -129,6 +129,7 @@ class PlaneDetector {
     
     int binImgWidth;
     int binImgHeight;
+    double cellResolution;
     
     double binCentreX;
     double binCentreY;

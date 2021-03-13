@@ -62,10 +62,11 @@ PlaneDetector::PlaneDetector(){
   this->binCentreY = 0;
   this->binWidth = 30;
   this->binHeight = 30;
+  this->cellResolution = 0.5;
   
   // (int) round(width/RES)
-  this->binImgWidth = (int) round(this->binWidth/0.5);
-  this->binImgHeight = (int) round(this->binHeight/0.5); 
+  this->binImgWidth = (int) round(this->binWidth/this->cellResolution);
+  this->binImgHeight = (int) round(this->binHeight/this->cellResolution); 
   
   this->binImage.resize(this->binImgWidth * this->binImgHeight);
   this->plane.setZero();
