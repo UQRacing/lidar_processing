@@ -48,5 +48,13 @@ target_link_libraries(planeDetection
                       ${pcl_ros_LIBRARIES}
                       UQRPointCloud)
 
+add_executable(binDetection
+               src/binDetectionNode.cpp
+               src/binDetector.cpp)
+       
+target_link_libraries(binDetection 
+                      ${pcl_ros_LIBRARIES}
+                      UQRPointCloud)
+
 #add_executable(cloudFilterSample src/cloudFilter.cpp)
 #target_link_libraries(cloudFilterSample ${catkin_LIBRARIES})
