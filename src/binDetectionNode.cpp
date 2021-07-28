@@ -16,8 +16,8 @@
  *
  */
 BinDetectionNode::BinDetectionNode() {
-  this->pointcloud_sub  = this->node.subscribe<sensor_msgs::PointCloud2>("/livox/lidar", 100, &BinDetectionNode::pointcloud_cb, this);
-  this->observation_pub = node.advertise<sensor_msgs::PointCloud2>("output_cloud", 100);
+  this->pointcloud_sub  = this->node.subscribe<sensor_msgs::PointCloud2>("/lslidar_point_cloud", 1, &BinDetectionNode::pointcloud_cb, this);
+  this->observation_pub = node.advertise<sensor_msgs::PointCloud2>("output_cloud", 1);
 }
 
 

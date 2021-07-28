@@ -41,6 +41,7 @@ void PlaneDetector::Bin::reset(){
   numPoints = 0;
   maxPoint = pcl::PointXYZ();
   minPoint = pcl::PointXYZ();
+  containsDetection = false;
   
   obstacleHeight  = 0;
 }
@@ -55,11 +56,10 @@ PlaneDetector::PlaneDetector(){
   this->maxHeight = 1;
   this->minPoints = 1;
   
-  this->heightThreshold = 0.2;
-  this->correspondenceThreshold = 0.2;
+  this->heightThreshold = 0.15;
   
-  this->binCentreX = 15;
-  this->binCentreY = 0;
+  this->binCentreX = 0;
+  this->binCentreY = 15;
   this->binWidth = 30;
   this->binHeight = 30;
   this->cellResolution = 0.5;
@@ -75,6 +75,10 @@ PlaneDetector::PlaneDetector(){
     bin = boost::shared_ptr<PlaneDetector::Bin>(new PlaneDetector::Bin);
     bin->reset();
   }  
+  
+  this->coneRadius = 0.2;
+  this->pointPortion = 0.5;
+  this->minConePoints = 5;
 }
 
 
@@ -87,7 +91,7 @@ PlaneDetector::PlaneDetector(){
  *
  */
 double PlaneDetector::get_height(double x, double y){
-  return this->plane(0)*(x-this->binCentreX) + this->plane(1)*y + this->plane(2);
+  return this->plane(0)*(x-this->binCentreX) + this->plane(1)*(y-this->binCentreY) + this->plane(2);
 }
 
 
@@ -98,12 +102,11 @@ double PlaneDetector::get_height(double x, double y){
  *
  */
 int PlaneDetector::point_to_index(pcl::PointXYZ& point){
-  int xBin = (int) round(this->binImgHeight*(point.x+this->binHeight/2)/this->binHeight);
-  int yBin = (int) round(this->binImgWidth*(point.y+this->binWidth/2)/this->binWidth);
+  int xBin = (int) round(this->binImgWidth*(point.x+this->binWidth/2 - this->binCentreX)/this->binWidth);
+  int yBin = (int) round(this->binImgHeight*(point.y+this->binHeight/2 - this->binCentreY)/this->binHeight);
   
-  int bindex = yBin + xBin * this->binImgWidth;
-  
-  if (bindex < 0 || bindex >= this->binImgWidth * this->binImgHeight) bindex = -1;
+  int bindex = xBin + yBin * this->binImgWidth;
+  if (xBin < 0 || xBin > (this->binImgWidth - 1) || yBin < 0 || yBin > (this->binImgHeight-1)) bindex = -1;
   return bindex;
 }
 
@@ -143,13 +146,75 @@ std::vector<boost::shared_ptr<PlaneDetector::Bin>> PlaneDetector::update(pcl::Po
 
   this->plane = (AT*A).ldlt().solve(AT*b);
   
-  std::vector<boost::shared_ptr<PlaneDetector::Bin>> outputBins;
+  std::vector<int> detectedBins;
   
   // Loop Over bins and filter MaxPoints
-  for(auto &bin: this->binImage){
-    if(bin->maxPoint.z - this->get_height(bin->maxPoint.x, bin->maxPoint.y) > this->heightThreshold)
+  for (int i = 0; i < this->binImage.size(); ++i){
+    if(this->binImage[i]->maxPoint.z - this->get_height(this->binImage[i]->maxPoint.x, this->binImage[i]->maxPoint.y) > this->heightThreshold &&
+       this->binImage[i]->numPoints > this->minPoints) {
+      this->binImage[i]->containsDetection = true;
+      detectedBins.push_back(i);
+    }
+  }
+  std::vector<int> visitedBins;
+  std::vector<boost::shared_ptr<PlaneDetector::Bin>> clusterBins;
+  
+  // Need to -> Loop through all indexes, check surrounding bins -> append to current bin if contains detection + add neighbours to visiting list
+  for (auto &i : detectedBins){
+    if(std::find(visitedBins.begin(), visitedBins.end(), i) == visitedBins.end()){
+      auto curBin = this->binImage[i];
+      std::vector<int> toVisitBins;
+      toVisitBins.push_back(i);
+      while (toVisitBins.size() > 0){
+        int indexCheck = toVisitBins[0];
+        visitedBins.push_back(toVisitBins[0]);
+        toVisitBins.erase(toVisitBins.begin());
+        // Add all points from bin to curBin unless checking curBin 
+        if (i != indexCheck) {
+          for (auto point : this->binImage[indexCheck]->points){
+            curBin->add_point(point);
+          }
+        }
+        
+        // Add Neighbouring Bins to check
+        for (int nXBin = -1; nXBin < 2; nXBin++){
+          for (int nYBin = -1; nYBin < 2; nYBin++){
+            int cYBin = int(indexCheck/this->binImgWidth);
+            int cXBin = indexCheck - cYBin * this->binImgWidth;
+            
+            int pXBin = (cXBin+nXBin);
+            int pYBin = (cYBin+nYBin);
+            
+            int pIndex = pXBin + pYBin * this->binImgWidth;
+            if (pYBin >= 0 && pYBin < (this->binImgHeight-1) && pXBin >= 0 && pXBin < this->binImgWidth && 
+                this->binImage[pIndex]->containsDetection &&
+                std::find(visitedBins.begin(), visitedBins.end(), pIndex) == visitedBins.end() && 
+                std::find(toVisitBins.begin(), toVisitBins.end(), pIndex) == toVisitBins.end()) // Valid Index
+              toVisitBins.push_back(pIndex);
+          }
+        }
+      }
+      clusterBins.push_back(this->binImage[i]);
+    }
+  }
+  
+  std::vector<boost::shared_ptr<PlaneDetector::Bin>> outputBins;
+  
+  for (auto &bin : clusterBins){
+    int validPoints = 0;
+    int totalPoints = 0;
+    for (auto &point : bin->points){
+      if (point.z - this->get_height(point.x, point.y) < this->heightThreshold/4.0) continue;
+      if (sqrt(pow(bin->maxPoint.x-point.x, 2) + pow(bin->maxPoint.y-point.y, 2)) < this->coneRadius) {
+        validPoints++;
+      }
+      totalPoints++;
+    }
+    
+    if (validPoints/((float) totalPoints) > this->pointPortion && bin->numPoints > this->minConePoints)
       outputBins.push_back(bin);
   }
+  
   
   return outputBins;
 }

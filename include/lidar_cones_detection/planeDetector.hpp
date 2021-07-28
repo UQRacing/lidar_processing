@@ -51,6 +51,7 @@ class PlaneDetector {
       double minHeight;
       double maxHeight;
       int numPoints;
+      bool containsDetection;
 
       // Reported Cone Colour
       ConeType colour;
@@ -125,7 +126,6 @@ class PlaneDetector {
     double maxHeight;
     int minPoints;
     double heightThreshold;
-    double correspondenceThreshold;
     
     int binImgWidth;
     int binImgHeight;
@@ -135,6 +135,10 @@ class PlaneDetector {
     double binCentreY;
     double binWidth;
     double binHeight;
+    
+    double coneRadius;
+    double pointPortion;
+    int minConePoints;
     
 };
 
