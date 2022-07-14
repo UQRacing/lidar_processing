@@ -73,6 +73,17 @@ target_link_libraries(ConeSegmenter ${OpenCV_LIBRARIES} Projector PCLWrapper Pro
 ## Executable ##
 ################
 
+# Optimisation
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    message(STATUS "Release build, enabling performance")
+    add_compile_options(-O3 -g3 -march=native -mtune=native -flto)
+    add_link_options(-flto)
+else()
+    message(STATUS "Debug build, enabling sanitizers")
+    add_compile_options(-Og -g3 -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address -fsanitize=undefined)
+endif()
+
 # FIXME: delete me; this is for testing purposed
 add_executable(testing src/test.cpp)
 target_link_libraries(testing

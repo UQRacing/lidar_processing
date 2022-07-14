@@ -61,7 +61,7 @@ SegmenterTester::SegmenterTester(){
 	nh.getParam("/segmenter/horizontal/max_angle", h_max);
 	nh.getParam("/segmenter/horizontal/resolution", h_res);
   
-	sub = nh.subscribe("lidar/raw", 1, &SegmenterTester::cloud_cb, this);
+	sub = nh.subscribe("/lslidar_point_cloud", 1, &SegmenterTester::cloud_cb, this);
   
   ROS_INFO_STREAM("Vertical: (" << v_res << ", " << v_min << ", " << v_max << ")");
   ROS_INFO_STREAM("Horizontal: (" << h_res << ", " << h_min << ", " << h_max << ")");
@@ -91,7 +91,7 @@ void SegmenterTester::cloud_cb(const sensor_msgs::PointCloud2& msg){
   uqr::PointCloud inputCloud(msg);
 
   start_ = ros::WallTime::now();
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud; // segfault occurs here
   cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
   *cloud = (pcl::PointCloud<pcl::PointXYZ>)inputCloud;
 
