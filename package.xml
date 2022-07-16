@@ -1,32 +1,41 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>lidar_cones_detection</name>
+  <name>lidar_cone_detection</name>
   <version>0.0.0</version>
   <description>Package to handle the identification of cones using LiDAR data.</description>
 
   <maintainer email="caleb@todo.todo">caleb</maintainer>
   <maintainer email="riley.d.bowyer@gmail.com">Riley Bowyer</maintainer>
+  <maintainer email="m.young2@uqconnect.edu.au">Matt Young</maintainer>
 
+  <license>TODO</license>
 
-  <license>MIT</license>
-
-  <!-- Catkin -->
   <buildtool_depend>catkin</buildtool_depend>
-
-  <!-- PCL -->
-  <depend>pcl_ros</depend>
-  <depend>pcl_conversions</depend>
-  <depend>PCL</depend>
-
-  <!-- Eigen -->
-  <depend>Eigen3</depend>
-
-  <!-- ROS Packages -->
-  <depend>roscpp</depend>
-  <depend>tf2</depend>
-  <depend>cv_bridge</depend>
-
-  <!-- Messages -->
-  <depend>sensor_msgs</depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>uqr_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>fssim_messages</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>Eigen3</build_depend>
+  
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>uqr_msgs</build_export_depend>
+  <build_export_depend>fssim_messages</build_export_depend>
+  <build_export_depend>geometry_msgs</build_export_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+  <build_export_depend>Eigen3</build_export_depend>
+  
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>uqr_msgs</exec_depend>
+  <exec_depend>fssim_messages</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>Eigen3</exec_depend>
 
 </package>

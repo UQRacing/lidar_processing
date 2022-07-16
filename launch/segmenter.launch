@@ -1,4 +1,0 @@
-<launch>
-    <rosparam command="load" file="$(find lidar_cones_detection)/config/segmenter.yaml"/>
-    <node pkg="lidar_cones_detection" type="segmentTesting" name="Segmenter" output="screen" launch-prefix=""/>
-</launch>

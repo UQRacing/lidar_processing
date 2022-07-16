@@ -1,17 +1,33 @@
-# Perception-ConesLiDAR
-LiDAR based object detection, specifically focused on identifying cones.
+# LiDAR Cone Detection
+This is the new and improved LiDAR cone detection code, based on the work originally done by Riley
+Bowyer and Caleb Aitken in 2020-2021.
 
+Compared to the original, the following changes have been made:
 
-# Contributing
-## Gitflow
-This repo has been setup to use Gitflow Workflow (more info [here](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow)).
+- Does not implement the custom UQR point cloud data type, it uses ROS & Open3D types directly
+- Only supports the LeiShen LiDAR currently
+- Uses Cilantro or Open3D instead of PCL, for a better API and more performance
 
-Instead of a single `master` branch, there are two main branches. `master` stores the release version, and `develop` serves as an integration branch for features.
+However, the general algorithm of ground plane segmentation to detect the cones is mostly left unchanged.
 
-Each new feature should have it's own branch `feature/name_of_feature`, and should branch off `develop`. When a feature is complete, please merge it into `develop`.
+**Original authors:**
 
-Pull requests must have been reviewed by at least one person before being completed. However, because this organisation is a free(?) account, this rule cannot be enforced.
+- Riley Bowyer (riley.d.bowyer@gmail.com)
+- Caleb Aitken (TODO)
 
-## Dependencies
-### pcl_ros
-Information [here](http://wiki.ros.org/pcl_ros).
+**Next version authors:**
+
+- Matt Young (m.young2@uqconnect.edu.au)
+- more to come :)
+
+The current maintainer is Matt Young.
+
+## Building and running
+Install dependencies:
+
+- Install Eigen3: `sudo apt install libeigen3-dev`
+- Install Cilantro (point cloud processing library): build from the source available at https://github.com/kzampog/cilantro
+    - Make sure to compile and `sudo make install` Pangolin first. Check Pangolin is compiled with Eigen enabled.
+    - When finished building Cilantro, run `sudo make install` and then `sudo ldconfig`.
+    - If you're not using Unix Makefiles as the CMake build target (i.e. you're using Ninja), just do `sudo ninja install`
+    or equivalent.
