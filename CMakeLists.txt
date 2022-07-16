@@ -4,7 +4,7 @@ project(lidar_cone_detection)
 ## Compile as C++17
 set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-std=c++17)
-add_compile_options(-Wall -Wextra -g3)
+add_compile_options(-Wall -Wextra -Wno-unused-parameter -g3)
 #add_link_options(-fuse-ld=lld)
 
 # Optimisation
@@ -32,8 +32,12 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 ## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(OpenGL) # this is (may be?) to appease Pangolin (a dependency of Cilantro)
+find_package(cilantro REQUIRED)
+find_package(Pangolin REQUIRED)
+# reference: https://github.com/kzampog/cilantro/issues/52 (note the fixed code)
 
 ###################################
 ## catkin specific configuration ##
@@ -60,6 +64,11 @@ catkin_package(
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
+    ${Eigen3_INCLUDE_DIRS}
+    ${OPENGL_INCLUDE_DIRS}
+    ${cilantro_INCLUDE_DIRS}
+    ${Pangolin_INCLUDE_DIRS}
+    ${Boost_INCLUDE_DIR}
 )
 
 ## Declare a C++ executable
@@ -75,4 +84,11 @@ add_executable(lidar_cone_detection src/lidar_cone.cpp)
 target_link_libraries(lidar_cone_detection
     ${catkin_LIBRARIES}
     Eigen3::Eigen
+    ${cilantro_LIBRARIES}
+    ${Cilantro_LIBRARIES}
+    ${CILANTRO_LIBRARIES}
+    ${Pangolin_LIBRARIES}
+    ${OPENGL_LIBRARIES}
+    ${Boost_LIBRARY_DIR}
+    cilantro
 )

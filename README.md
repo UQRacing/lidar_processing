@@ -4,11 +4,12 @@ Bowyer and Caleb Aitken in 2020-2021.
 
 Compared to the original, the following changes have been made:
 
-- Does not implement the custom UQR point cloud data type, it uses ROS & Open3D types directly
-- Only supports the LeiShen LiDAR currently
-- Uses Cilantro or Open3D instead of PCL, for a better API and more performance
+- Does not implement the custom UQR point cloud data type, it uses ROS & Cilantro types directly
+- Only supports the LeiShen LiDAR used on the AV to simplify development
+- Uses Cilantro instead of PCL, for a better API and more performance
+    - If Cilantro doesn't work, we'll move to Open3D instead, trying to avoid PCL as much as possible
 
-However, the general algorithm of ground plane segmentation to detect the cones is mostly left unchanged.
+However, the general concept of ground plane segmentation to detect the cones is mostly left as-is.
 
 **Original authors:**
 
