@@ -12,14 +12,11 @@ namespace uqr {
 
     private:
         ros::Subscriber lidarSub; // subscribe to cones
-        ros::Publisher conePub; // publish detected cones
+        ros::Publisher conePub, lidarDebugPub; // publish detected cones
 
         std::string lidarTopicName;
+        std::string lidarDebugTopicName;
         bool enableDebugUI{};
-
-        // FIXME this is absolutely atrocious, find a better way to fake-init "viz" in case debug is disabled
-        // or, since the visualiser doesn't appear to work AT ALL, maybe disable it entirely?
-        std::optional<cilantro::Visualizer> viz;
 
         void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud);
     };

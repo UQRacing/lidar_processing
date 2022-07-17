@@ -14,19 +14,19 @@ LidarConeDetector::LidarConeDetector(ros::NodeHandle &handle) {
     if (!handle.getParam("/lidar_cone_detector/lidar_topic", lidarTopicName)) {
         ROS_ERROR("Failed to load lidar_topic from lidar cone config YAML");
     }
-    if (!handle.getParam("/lidar_cone_detector/debug_ui", enableDebugUI)) {
-        ROS_ERROR("bruh cringe");
-    }
+    handle.getParam("/lidar_cone_detector/debug_ui", enableDebugUI);
+    handle.getParam("/lidar_cone_detector/lidar_debug_pub", lidarDebugTopicName);
 
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarConeDetector::lidarCallback, this);
     // TODO conePub (figure out what message type we publish)
 
-    if (enableDebugUI) {
-        ROS_INFO("Enabling Pangolin debug UI");
-        std::string windowName = "LiDAR Cone Detection";
-        pangolin::CreateWindowAndBind(windowName, 1600, 900);
-        viz = cilantro::Visualizer(windowName, "disp");
+    if (!lidarDebugTopicName.empty()) {
+        ROS_INFO("Registering lidar debug topic %s", lidarDebugTopicName.c_str());
+        lidarDebugPub = handle.advertise<sensor_msgs::PointCloud2>(lidarDebugTopicName, 1);
     }
+
+    //if (enableDebugUI) {
+    //}
 }
 
 void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
@@ -59,12 +59,23 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
 
     ROS_INFO("have %zu points", cloud.size());
 
-    if (enableDebugUI) {
-        viz->clear();
-        viz->addObject<cilantro::PointCloudRenderable>("cloud", cloud.points,
-                                                       cilantro::RenderingProperties().setPointColor(1, 0, 0).setPointSize(3.0));
+    // estimate plane for ground
+    cilantro::PlaneRANSACEstimator3f<> planeEstimator(cloud.points);
+    planeEstimator.setMaxInlierResidual(0.01f)
+            .setTargetInlierCount((size_t)(0.15 * cloud.size()))
+            .setMaxNumberOfIterations(250)
+            .setReEstimationStep(true);
+
+    Eigen::Hyperplane<float, 3> plane = planeEstimator.estimate().getModel();
+    const auto& inliers = planeEstimator.getModelInliers();
+    ROS_INFO("have %zu inliers, did %zu RANSAC iterations", inliers.size(), planeEstimator.getNumberOfPerformedIterations());
+
+    // publish debug
+    if (!lidarDebugTopicName.empty()) {
+        ROS_INFO("publishing debug");
+        sensor_msgs::PointCloud2 rosDebugCloud{};
+        cilantro::PointCloud3f debugCloud(cloud, inliers);
     }
-    viz->spinOnce(); // segfaults, probably because it's not on main thread (or data is corrupt somehow?)
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
     ROS_INFO("Lidar callback time: %.2f ms", time);
