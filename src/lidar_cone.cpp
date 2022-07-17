@@ -3,10 +3,9 @@
 #include "lidar_cone_detection/lidar_cone.h"
 #include "lidar_cone_detection/defines.h"
 #include <ros/ros.h>
-#include <pangolin/display/display.h>
-#include <cilantro/cilantro.hpp>
-#include <cilantro/core/data_containers.hpp>
 #include <sensor_msgs/point_cloud2_iterator.h>
+#include "lidar_cone_detection/open3d_conversions.h"
+#include <open3d/Open3D.h>
 
 using namespace uqr;
 
@@ -21,60 +20,44 @@ LidarConeDetector::LidarConeDetector(ros::NodeHandle &handle) {
     // TODO conePub (figure out what message type we publish)
 
     if (!lidarDebugTopicName.empty()) {
-        ROS_INFO("Registering lidar debug topic %s", lidarDebugTopicName.c_str());
+        ROS_INFO("Publishing lidar debug to topic %s", lidarDebugTopicName.c_str());
         lidarDebugPub = handle.advertise<sensor_msgs::PointCloud2>(lidarDebugTopicName, 1);
     }
 
-    //if (enableDebugUI) {
-    //}
+    if (enableDebugUI) {
+        // TODO
+    }
 }
+
+// inspiration for this method comes from:
+// https://github.com/ros-perception/perception_open3d/blob/main/open3d_conversions/src/open3d_conversions.cpp
 
 void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
     auto start = ros::WallTime::now();
 
-    // inspiration for this method comes from:
-    // https://github.com/ros-perception/perception_open3d/blob/main/open3d_conversions/src/open3d_conversions.cpp
+    open3d::geometry::PointCloud cloud;
+    open3d_conversions::rosToOpen3d(rosCloud, cloud, true);
 
-    // hack(?) to convert the const pointer to a non-const pointer, which, for some stupid reason,
-    // the iterator requires (it appears the PCL developers in their infinite wisdom chose to classify
-    // the mutable and immutable iterators as the same thing)
-    sensor_msgs::PointCloud2 rosCloudData = *rosCloud;
+    // voxel downsample, reduce the resolution of the point cloud to speed up the following algorithms
+    // not doing this yet because I think we'll need the resolution
+    // auto downsampledCloud = *cloud.VoxelDownSample(0.05);
 
-    // iterate over ROS point cloud fields
-    auto iterX = sensor_msgs::PointCloud2Iterator<float>(rosCloudData, "x");
-    auto iterY = sensor_msgs::PointCloud2Iterator<float>(rosCloudData, "y");
-    auto iterZ = sensor_msgs::PointCloud2Iterator<float>(rosCloudData, "z");
+    // perform RANSAC plane segmentation
+    // reference: http://www.open3d.org/docs/latest/tutorial/Basic/pointcloud.html#Plane-segmentation
+    // TODO make these parameters configurable in the YAML
+    auto [planeModel, inliers] =
+            cloud.SegmentPlane(0.01, 3, 100, 0xDEE5);
 
-    cilantro::PointCloud3f cloud;
-    std::vector<float> points{};
-    // it appears, somehow, _not_ pre-allocating the buffer is actually faster
-    //points.reserve(rosCloud->width * rosCloud->height); // pre-allocate point cloud to save growing
-    for (size_t i = 0; i < rosCloud->width * rosCloud->height; ++i, ++iterX, ++iterY, ++iterZ) {
-        points.push_back(*iterX);
-        points.push_back(*iterY);
-        points.push_back(*iterZ);
-    }
-    cilantro::DataMatrixMap3f data(points);
-    cloud.points = data;
-
-    ROS_INFO("have %zu points", cloud.size());
-
-    // estimate plane for ground
-    cilantro::PlaneRANSACEstimator3f<> planeEstimator(cloud.points);
-    planeEstimator.setMaxInlierResidual(0.01f)
-            .setTargetInlierCount((size_t)(0.15 * cloud.size()))
-            .setMaxNumberOfIterations(250)
-            .setReEstimationStep(true);
-
-    Eigen::Hyperplane<float, 3> plane = planeEstimator.estimate().getModel();
-    const auto& inliers = planeEstimator.getModelInliers();
-    ROS_INFO("have %zu inliers, did %zu RANSAC iterations", inliers.size(), planeEstimator.getNumberOfPerformedIterations());
+    // everything except the ground plane
+    auto notGroundCloud = *cloud.SelectByIndex(inliers, true);
 
     // publish debug
     if (!lidarDebugTopicName.empty()) {
-        ROS_INFO("publishing debug");
         sensor_msgs::PointCloud2 rosDebugCloud{};
-        cilantro::PointCloud3f debugCloud(cloud, inliers);
+
+        // publish the inliers of the plane model as a separate cloud
+        open3d_conversions::open3dToRos(notGroundCloud, rosDebugCloud, "laser_link");
+        lidarDebugPub.publish(rosDebugCloud);
     }
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;

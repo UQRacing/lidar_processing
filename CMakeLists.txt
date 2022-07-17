@@ -34,10 +34,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-find_package(OpenGL) # this is (may be?) to appease Pangolin (a dependency of Cilantro)
-find_package(cilantro REQUIRED)
-find_package(Pangolin REQUIRED)
-# reference: https://github.com/kzampog/cilantro/issues/52 (note the fixed code)
+find_package(Open3D REQUIRED)
 
 ###################################
 ## catkin specific configuration ##
@@ -65,16 +62,14 @@ include_directories(
     include
     ${catkin_INCLUDE_DIRS}
     ${Eigen3_INCLUDE_DIRS}
-    ${OPENGL_INCLUDE_DIRS}
-    ${cilantro_INCLUDE_DIRS}
-    ${Pangolin_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIR}
+    ${Open3D_INCLUDE_DIRS}
 )
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(lidar_cone_detection src/lidar_cone.cpp)
+add_executable(lidar_cone_detection src/lidar_cone.cpp src/open3d_conversions.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
@@ -84,11 +79,6 @@ add_executable(lidar_cone_detection src/lidar_cone.cpp)
 target_link_libraries(lidar_cone_detection
     ${catkin_LIBRARIES}
     Eigen3::Eigen
-    ${cilantro_LIBRARIES}
-    ${Cilantro_LIBRARIES}
-    ${CILANTRO_LIBRARIES}
-    ${Pangolin_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     ${Boost_LIBRARY_DIR}
-    cilantro
+    Open3D::Open3D
 )

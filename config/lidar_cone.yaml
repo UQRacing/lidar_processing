@@ -5,5 +5,16 @@ lidar_cone_detector:
   lidar_topic: "/lslidar_point_cloud"
   # Topic to publish debug point cloud to, if empty string debug topic publishing is disabled
   lidar_debug_pub: "/lidar_cone/debug"
-  # Whether to display the Pangolin debug UI or not
+  # Whether to display the Open3D debug UI or not (if such a thing is implemented)
   debug_ui: true
+
+  # Parameters for Open3D plane segmentation
+  # Max distance a point can be from the plane model, and still be considered an inlier.
+  segment_dist_thresh: 0.01
+  # Number of initial points to be considered inliers in each iteration.
+  segment_ransac_n: 3
+  # (Maximum?) Number of RANSAC iterations to be performed
+  segment_num_iters: 100
+
+  # Parameters for Open3D voxel downsampling
+  voxeliser_resolution: 0.01

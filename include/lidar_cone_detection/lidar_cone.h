@@ -3,7 +3,6 @@
 #pragma once
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <cilantro/cilantro.hpp>
 
 namespace uqr {
     class LidarConeDetector {
