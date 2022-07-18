@@ -1,8 +1,15 @@
-// LiDAR cone detector, main header
-// Matt Young (with much prior work done by Riley Bowyer & Caleb Aitken), 2022, UQRacing
+// LiDAR cone detector (new version), main header
+// Matt Young, 2022, UQRacing
 #pragma once
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <dynamic_reconfigure/server.h>
+// FIXME CLion doesn't detect this stupid ass fucking header
+//#include <lidar_cone_detection/LidarConeConfig.h>
+
+#ifdef __JETBRAINS_IDE__
+// hack to load the full path of the header file here?
+#endif
 
 namespace uqr {
     class LidarConeDetector {

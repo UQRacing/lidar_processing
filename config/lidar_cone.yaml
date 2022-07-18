@@ -3,18 +3,28 @@
 lidar_cone_detector:
   # Topic to receive PointCloud2 LiDAR data from
   lidar_topic: "/lslidar_point_cloud"
-  # Topic to publish debug point cloud to, if empty string debug topic publishing is disabled
+  # Topic to publish debug point cloud to, if empty string debug topic is disabled
   lidar_debug_pub: "/lidar_cone/debug"
   # Whether to display the Open3D debug UI or not (if such a thing is implemented)
   debug_ui: true
 
+  # Each block below corresponds to a stage of the cone detection pipeline.
+  # The blocks are ordered chronologically.
+
   # Parameters for Open3D plane segmentation
   # Max distance a point can be from the plane model, and still be considered an inlier.
-  segment_dist_thresh: 0.01
+  plane_dist_thresh: 0.01
   # Number of initial points to be considered inliers in each iteration.
-  segment_ransac_n: 3
+  plane_ransac_n: 3
   # (Maximum?) Number of RANSAC iterations to be performed
-  segment_num_iters: 100
+  plane_num_iters: 100
 
   # Parameters for Open3D voxel downsampling
+  # Voxel grid resolution
   voxeliser_resolution: 0.01
+
+  # Parameters for Open3D DBSCAN clustering
+  # Epsilon value
+  dbscan_eps: 2.0
+  # Min points
+  dbscan_min_pts: 5

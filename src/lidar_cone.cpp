@@ -1,5 +1,5 @@
-// LiDAR cone detector, main file
-// Matt Young (with much prior work done by Riley Bowyer & Caleb Aitken), 2022, UQRacing
+// LiDAR cone detector (new version), main file
+// Matt Young, 2022, UQRacing
 #include "lidar_cone_detection/lidar_cone.h"
 #include "lidar_cone_detection/defines.h"
 #include <ros/ros.h>
@@ -17,11 +17,13 @@ LidarConeDetector::LidarConeDetector(ros::NodeHandle &handle) {
     handle.getParam("/lidar_cone_detector/lidar_debug_pub", lidarDebugTopicName);
 
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarConeDetector::lidarCallback, this);
-    // TODO conePub (figure out what message type we publish)
+    // TODO conePub (figure out what message type we publish first, a point cloud?? bounding box?)
 
     if (!lidarDebugTopicName.empty()) {
         ROS_INFO("Publishing lidar debug to topic %s", lidarDebugTopicName.c_str());
         lidarDebugPub = handle.advertise<sensor_msgs::PointCloud2>(lidarDebugTopicName, 1);
+    } else {
+        ROS_INFO("Debug publishing disabled by config");
     }
 
     if (enableDebugUI) {
@@ -46,10 +48,17 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
     // reference: http://www.open3d.org/docs/latest/tutorial/Basic/pointcloud.html#Plane-segmentation
     // TODO make these parameters configurable in the YAML
     auto [planeModel, inliers] =
-            cloud.SegmentPlane(0.01, 3, 100, 0xDEE5);
+            cloud.SegmentPlane(0.1, 8, 100, 0xDEE5);
 
     // everything except the ground plane
     auto notGroundCloud = *cloud.SelectByIndex(inliers, true);
+
+    // DBSCAN doesn't seem to work to well on
+    auto voxelised = *notGroundCloud.VoxelDownSample(0.5);
+
+    // cluster with DBSCAN
+    // TODO make these configurable in the YAML
+    auto clusteredPoints = voxelised.ClusterDBSCAN(2.0, 5);
 
     // publish debug
     if (!lidarDebugTopicName.empty()) {
@@ -67,7 +76,7 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
 
 int main(int argc, char *argv[]) {
     ros::init(argc, argv, "lidar_cone");
-    ROS_INFO("LiDAR Cone Detection v" LIDAR_CONE_VERSION ": Matt Young, Riley Bowyer, Caleb Aitken, 2021-2022, UQRacing");
+    ROS_INFO("LiDAR Cone Detection v" LIDAR_CONE_VERSION ": Matt Young, Fahed Alhanaee, Riley Bowyer, Caleb Aitken, 2021-2022, UQRacing");
 
     ros::NodeHandle handle{};
     LidarConeDetector detector = LidarConeDetector(handle);

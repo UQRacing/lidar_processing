@@ -26,6 +26,7 @@ The current maintainer of the repo is Matt Young.
 Install dependencies:
 
 - Install Eigen3: `sudo apt install libeigen3-dev`
+- Install [rviz_visual_tools](https://github.com/PickNikRobotics/rviz_visual_tools): `sudo apt install ros-noetic-rviz-visual-tools`
 - Install Open3D. This is extremely difficult to compile from source due to conflict C++ ABI dependency, so
 [click here](https://github.com/isl-org/Open3D/releases/download/v0.15.1/open3d-devel-linux-x86_64-cxx11-abi-0.15.1.tar.xz)
 to download a compiled build (30MB LZMA TAR). Then:

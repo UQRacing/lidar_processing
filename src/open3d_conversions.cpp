@@ -161,7 +161,7 @@ namespace open3d_conversions {
         for (auto &field_name: field_names) {
             std::string data_type = data_types[count];
             if (field_name == "xyz") {
-                for (size_t i = 0; i < o3d_TensorList_points.GetShape()[0]; i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z) {
+                for (int64_t i = 0; i < o3d_TensorList_points.GetShape()[0]; i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z) {
                     open3d::core::Tensor point = o3d_TensorList_points[i];
                     *ros_pc2_x = point[0].Item<float>();
                     *ros_pc2_y = point[1].Item<float>();
@@ -173,7 +173,7 @@ namespace open3d_conversions {
                 sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_r(ros_pc2, "r");
                 sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_g(ros_pc2, "g");
                 sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_b(ros_pc2, "b");
-                for (size_t i = 0; i < o3d_TensorList_points.GetShape()[0]; i++, ++ros_pc2_r, ++ros_pc2_g, ++ros_pc2_b) {
+                for (int64_t i = 0; i < o3d_TensorList_points.GetShape()[0]; i++, ++ros_pc2_r, ++ros_pc2_g, ++ros_pc2_b) {
                     open3d::core::Tensor color = o3d_TensorList_colors[i];
                     *ros_pc2_r = (int) (255 * color[0].Item<float>());
                     *ros_pc2_g = (int) (255 * color[1].Item<float>());
@@ -189,7 +189,7 @@ namespace open3d_conversions {
                                                                          field_name + "_y");
                     sensor_msgs::PointCloud2Iterator<uint8_t> ros_pc2_fz(ros_pc2,
                                                                          field_name + "_z");
-                    for (size_t i = 0; i < o3d_TensorList_points.GetShape()[0];
+                    for (int64_t i = 0; i < o3d_TensorList_points.GetShape()[0];
                          i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_fx, ++ros_pc2_fy, ++ros_pc2_fz) {
                         open3d::core::Tensor field_tensor = o3d_TensorList_points[i];
                         *ros_pc2_fx = field_tensor[0].Item<int>();
@@ -200,7 +200,7 @@ namespace open3d_conversions {
                     sensor_msgs::PointCloud2Iterator<float> ros_pc2_fx(ros_pc2, field_name + "_x");
                     sensor_msgs::PointCloud2Iterator<float> ros_pc2_fy(ros_pc2, field_name + "_y");
                     sensor_msgs::PointCloud2Iterator<float> ros_pc2_fz(ros_pc2, field_name + "_z");
-                    for (size_t i = 0; i < o3d_TensorList_points.GetShape()[0];
+                    for (int64_t i = 0; i < o3d_TensorList_points.GetShape()[0];
                          i++, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z, ++ros_pc2_fx, ++ros_pc2_fy, ++ros_pc2_fz) {
                         open3d::core::Tensor field_tensor = o3d_TensorList_points[i];
                         *ros_pc2_fx = field_tensor[0].Item<float>();
@@ -224,7 +224,7 @@ namespace open3d_conversions {
         open3d::core::Device device_type(open3d::core::Device::DeviceType::CPU, 0);
         std::vector<Eigen::Vector3d> o3d_TensorList_points;
 
-        for (int num_fields = 0; num_fields < ros_pc2->fields.size(); num_fields++) {
+        for (size_t num_fields = 0; num_fields < ros_pc2->fields.size(); num_fields++) {
             if (ros_pc2->fields[num_fields].name == "x") {
                 for (size_t i = 0; i < ros_pc2->height *
                                        ros_pc2->width; ++i, ++ros_pc2_x, ++ros_pc2_y, ++ros_pc2_z) {
@@ -311,7 +311,7 @@ namespace open3d_conversions {
     }
 }    // namespace open3d_conversions
 
-inline int
+inline unsigned int
 addPointField(sensor_msgs::PointCloud2 &cloud_msg, const std::string &name, int count, int datatype,
               int offset) {
     sensor_msgs::PointField point_field;

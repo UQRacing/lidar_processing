@@ -4,7 +4,7 @@ project(lidar_cone_detection)
 ## Compile as C++17
 set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-std=c++17)
-add_compile_options(-Wall -Wextra -Wno-unused-parameter -g3)
+add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -g3)
 #add_link_options(-fuse-ld=lld)
 
 # Optimisation
@@ -29,6 +29,7 @@ find_package(catkin REQUIRED COMPONENTS
     fssim_messages
     geometry_msgs
     sensor_msgs
+    dynamic_reconfigure
 )
 
 ## System dependencies are found with CMake's conventions
@@ -39,6 +40,11 @@ find_package(Open3D REQUIRED)
 ###################################
 ## catkin specific configuration ##
 ###################################
+# do dynamic reconfiguration
+generate_dynamic_reconfigure_options(
+    cfg/LidarCone.cfg
+)
+
 ## The catkin_package macro generates cmake config files for your package
 ## Declare things to be passed to dependent projects
 ## INCLUDE_DIRS: uncomment this if your package contains header files
