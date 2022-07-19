@@ -30,8 +30,10 @@ Install dependencies:
 - Install Open3D. This is extremely difficult to compile from source due to conflict C++ ABI dependency, so
 [click here](https://github.com/isl-org/Open3D/releases/download/v0.15.1/open3d-devel-linux-x86_64-cxx11-abi-0.15.1.tar.xz)
 to download a compiled build (30MB LZMA TAR). Then:
-    1. Extract the contained folder to a directory of your choosing, I use ~/build
-    2. Copy open3d/lib/libOpen3D.so to /usr/local/lib (this and the below may require a root file window)
-    3. Copy directory open3d/lib/cmake/Open3D/ to /usr/local/lib/cmake/
-    4. Copy directory open3d/include/open3d/ to /usr/local/include/
-    5. Run `sudo ldconfig`
+    1. Make sure you have the LLVM Standard C++ library installed
+    (specifically `libc++-7-dev`): with `sudo apt install libc++-7-dev`
+    2. Extract the contained folder to a directory of your choosing, I use ~/build
+    3. Copy open3d/lib/libOpen3D.so to /usr/local/lib (this and the below may require a root file window)
+    4. Copy directory open3d/lib/cmake/Open3D/ to /usr/local/lib/cmake/
+    5. Copy directory open3d/include/open3d/ to /usr/local/include/
+    6. Run `sudo ldconfig`
