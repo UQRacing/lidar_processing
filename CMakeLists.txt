@@ -30,6 +30,7 @@ find_package(catkin REQUIRED COMPONENTS
     geometry_msgs
     sensor_msgs
     dynamic_reconfigure
+    visualization_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -54,7 +55,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
 #  INCLUDE_DIRS ${OMPL_INCLUDE_DIRS} ${GEOS_INCLUDE_DIRS}
 #  LIBRARIES lidar_cone_detection
-  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs
+  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs visualization_msgs
 #  DEPENDS
 )
 

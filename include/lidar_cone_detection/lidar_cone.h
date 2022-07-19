@@ -18,11 +18,23 @@ namespace uqr {
 
     private:
         ros::Subscriber lidarSub; // subscribe to cones
-        ros::Publisher conePub, lidarDebugPub; // publish detected cones
+        ros::Publisher conePub, lidarDebugPub, detectDebugPub; // publish detected cones
 
-        std::string lidarTopicName;
-        std::string lidarDebugTopicName;
+        // YAML parameters
+        std::string lidarTopicName{};
+        std::string lidarDebugTopicName{}, detectDebugTopicName{};
         bool enableDebugUI{};
+
+        // RANSAC ground plane fit parameters
+        double planeDistThresh{};
+        int32_t planeRansacN{}, planeNumIters{};
+
+        // Voxeliser parameters
+        double voxeliserResolution{};
+
+        // DBSCAN clustering parameters
+        double dbscanEps{};
+        int32_t dbscanMinPts{};
 
         void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud);
     };
