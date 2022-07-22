@@ -3,13 +3,7 @@
 #pragma once
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <dynamic_reconfigure/server.h>
-// FIXME CLion doesn't detect this stupid ass fucking header
-//#include <lidar_cone_detection/LidarConeConfig.h>
-
-#ifdef __JETBRAINS_IDE__
-// hack to load the full path of the header file here?
-#endif
+#include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 
 namespace uqr {
     class LidarConeDetector {
@@ -29,12 +23,17 @@ namespace uqr {
         double planeDistThresh{};
         int32_t planeRansacN{}, planeNumIters{};
 
+        // Crop bounding bbox
+        double bboxMinX{}, bboxMinY{}, bboxMinZ{}, bboxMaxX{}, bboxMaxY{}, bboxMaxZ{};
+
         // Voxeliser parameters
         double voxeliserResolution{};
 
         // DBSCAN clustering parameters
         double dbscanEps{};
         int32_t dbscanMinPts{};
+
+        ddynamic_reconfigure::DDynamicReconfigure ddr{};
 
         void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud);
     };

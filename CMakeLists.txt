@@ -29,8 +29,8 @@ find_package(catkin REQUIRED COMPONENTS
     fssim_messages
     geometry_msgs
     sensor_msgs
-    dynamic_reconfigure
     visualization_msgs
+    ddynamic_reconfigure
 )
 
 ## System dependencies are found with CMake's conventions
@@ -41,11 +41,6 @@ find_package(Open3D REQUIRED)
 ###################################
 ## catkin specific configuration ##
 ###################################
-# do dynamic reconfiguration
-generate_dynamic_reconfigure_options(
-    cfg/LidarCone.cfg
-)
-
 ## The catkin_package macro generates cmake config files for your package
 ## Declare things to be passed to dependent projects
 ## INCLUDE_DIRS: uncomment this if your package contains header files
@@ -55,7 +50,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
 #  INCLUDE_DIRS ${OMPL_INCLUDE_DIRS} ${GEOS_INCLUDE_DIRS}
 #  LIBRARIES lidar_cone_detection
-  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs visualization_msgs
+  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs visualization_msgs ddynamic_reconfigure
 #  DEPENDS
 )
 

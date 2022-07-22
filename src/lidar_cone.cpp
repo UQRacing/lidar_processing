@@ -7,8 +7,11 @@
 #include "lidar_cone_detection/open3d_conversions.h"
 #include <open3d/Open3D.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 
 using namespace uqr;
+
+#define DEBUG_CROP 1
 
 // very lazily borrowed and reformatted from https://www.codespeedy.com/hsv-to-rgb-in-cpp/
 static Eigen::Matrix<double, 3, 1> hsvToRgb(double H, double S, double V) {
@@ -53,6 +56,14 @@ LidarConeDetector::LidarConeDetector(ros::NodeHandle &handle) {
     handle.getParam("/lidar_cone_detector/dbscan_eps", dbscanEps);
     handle.getParam("/lidar_cone_detector/dbscan_min_pts", dbscanMinPts);
 
+    // generated with python (probably a better way of doing this)
+    handle.getParam("/lidar_cone_detector/bbox_min_x", bboxMinX);
+    handle.getParam("/lidar_cone_detector/bbox_min_y", bboxMinY);
+    handle.getParam("/lidar_cone_detector/bbox_min_z", bboxMinZ);
+    handle.getParam("/lidar_cone_detector/bbox_max_x", bboxMaxX);
+    handle.getParam("/lidar_cone_detector/bbox_max_y", bboxMaxY);
+    handle.getParam("/lidar_cone_detector/bbox_max_z", bboxMaxZ);
+
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarConeDetector::lidarCallback, this);
     // TODO conePub (figure out what message type we publish first, a point cloud?? bounding box?)
 
@@ -73,6 +84,20 @@ LidarConeDetector::LidarConeDetector(ros::NodeHandle &handle) {
     if (enableDebugUI) {
         // in case we want to do Open3D based debugging
     }
+
+    // setup ddynamic_reconfigure
+//    ddr.registerVariable("planeDistThresh", &planeDistThresh, "Plane distance threshold", 0.01, 2.0);
+//    ddr.registerVariable("planeRansacN", &planeRansacN, "Plane RANSAC count", 1, 100);
+//    ddr.registerVariable("planeNumIters", &planeNumIters, "Plane num iterations", 10, 512);
+
+    // generated with python
+    ddr.registerVariable("bbox_min_x", &bboxMinX, "LiDAR bounding box min x", -100.0, 100.0);
+    ddr.registerVariable("bbox_min_y", &bboxMinY, "LiDAR bounding box min y", -100.0, 100.0);
+    ddr.registerVariable("bbox_min_z", &bboxMinZ, "LiDAR bounding box min z", -100.0, 100.0);
+    ddr.registerVariable("bbox_max_x", &bboxMaxX, "LiDAR bounding box max x", -100.0, 100.0);
+    ddr.registerVariable("bbox_max_y", &bboxMaxY, "LiDAR bounding box max y", -100.0, 100.0);
+    ddr.registerVariable("bbox_max_z", &bboxMaxZ, "LiDAR bounding box max z", -100.0, 100.0);
+    ddr.publishServicesTopics();
 }
 
 void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
@@ -81,17 +106,13 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
     open3d::geometry::PointCloud cloud;
     open3d_conversions::rosToOpen3d(rosCloud, cloud, true);
 
-    // perform RANSAC plane segmentation
-    // reference: http://www.open3d.org/docs/latest/tutorial/Basic/pointcloud.html#Plane-segmentation
-    // use a constant seed 0xDEE5 (lmao) to produce more predictable and hopefully more temporally stable
-    // results?
-    auto [planeModel, inliers] =
-            cloud.SegmentPlane(planeDistThresh, planeRansacN,
-                               planeNumIters, 0xDEE5);
+    // crop point cloud
+    Eigen::Vector3d bboxMin(bboxMinX, bboxMinY, bboxMinZ); // TODO ddynamic_reconfigure
+    Eigen::Vector3d bboxMax(bboxMaxX, bboxMaxY, bboxMaxZ);
+    open3d::geometry::AxisAlignedBoundingBox bbox(bboxMin, bboxMax);
+    auto notGroundCloud = *cloud.Crop(bbox);
 
-    // grab everything except the ground plane
-    auto notGroundCloud = *cloud.SelectByIndex(inliers, true);
-
+#if !DEBUG_CROP
     // DBSCAN is incredibly slow on large point clouds, so voxel downscale after segmentation. we don't
     // downscale _before_ segmentation (yet), because I think RANSAC will be to inaccurate then and destroy
     // potential cones in the process.
@@ -100,14 +121,16 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
 
     // cluster with DBSCAN
     auto clusteredReduced = reduced.ClusterDBSCAN(dbscanEps, dbscanMinPts);
+#endif
 
     // publish lidar debug
     if (!lidarDebugTopicName.empty()) {
         sensor_msgs::PointCloud2 rosDebugCloud{};
 
+#if !DEBUG_CROP
         // map DBSCAN clusters to colour
         int numClusters = *std::max_element(clusteredReduced.begin(), clusteredReduced.end());
-        ROS_INFO("max clusters %d", numClusters);
+//        ROS_INFO("max clusters %d", numClusters);
 
         for (int i : clusteredReduced) {
             Eigen::Matrix<double, 3, 1> colour;
@@ -119,13 +142,17 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
                 double h = ((double) i / (double) numClusters) * 360.0;
                 colour = hsvToRgb(h, 100.0, 100.0);
             }
-
             reduced.colors_.emplace_back(colour);
         }
 
         // publish the inliers of the plane model as a separate cloud
         open3d_conversions::open3dToRos(reduced, rosDebugCloud, "laser_link");
         lidarDebugPub.publish(rosDebugCloud);
+#else
+        // publish the full cloud for debugging the crop
+        open3d_conversions::open3dToRos(notGroundCloud, rosDebugCloud, "laser_link");
+        lidarDebugPub.publish(rosDebugCloud);
+#endif
     }
 
     // publish detect debug
@@ -141,6 +168,7 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
 int main(int argc, char *argv[]) {
     ros::init(argc, argv, "lidar_cone");
     ROS_INFO("LiDAR Cone Detection v" LIDAR_CONE_VERSION ": Matt Young, Fahed Alhanaee, Riley Bowyer, Caleb Aitken, 2021-2022, UQRacing");
+    open3d::PrintOpen3DVersion();
 
     ros::NodeHandle handle{};
     LidarConeDetector detector = LidarConeDetector(handle);
