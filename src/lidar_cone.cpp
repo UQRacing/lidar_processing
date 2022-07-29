@@ -112,16 +112,30 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
     open3d::geometry::AxisAlignedBoundingBox bbox(bboxMin, bboxMax);
     auto notGroundCloud = *cloud.Crop(bbox);
 
-#if !DEBUG_CROP
-    // DBSCAN is incredibly slow on large point clouds, so voxel downscale after segmentation. we don't
-    // downscale _before_ segmentation (yet), because I think RANSAC will be to inaccurate then and destroy
-    // potential cones in the process.
-    // statistical/radius outlier removal would also help, but it appears to be even slower
-    auto reduced = *notGroundCloud.VoxelDownSample(voxeliserResolution);
+    auto clustered = notGroundCloud.ClusterDBSCAN(dbscanEps, dbscanMinPts);
 
-    // cluster with DBSCAN
-    auto clusteredReduced = reduced.ClusterDBSCAN(dbscanEps, dbscanMinPts);
-#endif
+    //creating a arry of arrys of clusters indexes
+    auto max = *std::max_element(clustered.begin(), clustered.end());
+    std::vector<long unsigned int>* clustersindex[max + 1];
+    for (int i = 0; i <= max; i++ ) {
+        clustersindex[i] = new std::vector<long unsigned int>;  
+    }
+    for(unsigned int i = 0; i < clustered.size(); i++) {
+        if (clustered[i] >= 0) {
+            clustersindex[clustered[i]]->push_back(i);
+        }
+    }
+
+    //calculating the centers
+    std::vector<Eigen::Vector3d> centers;
+    for (int i = 0; i <= max; i++) {
+        auto cluster = *notGroundCloud.SelectByIndex(*clustersindex[i], false);
+        centers.push_back(cluster.GetCenter());
+	delete clustersindex[i];
+	ROS_INFO("xy: %.2f, %0.2f", centers[i].x() ,centers[i].y() );
+    }
+
+
 
     // publish lidar debug
     if (!lidarDebugTopicName.empty()) {

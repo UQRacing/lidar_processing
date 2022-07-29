@@ -24,11 +24,11 @@ lidar_cone_detector:
   # Parameters for OpenCV bounding box dimensions
   bbox_min_x: -50
   bbox_min_y: -10
-  bbox_min_z: -50
+  bbox_min_z: -0.9
 
   bbox_max_x: 50
   bbox_max_y: 10
-  bbox_max_z: 50
+  bbox_max_z: 10
 
   # Parameters for Open3D voxel downsampling
   # Voxel grid resolution (make it pretty high, this is done for performance reasons)
@@ -36,6 +36,6 @@ lidar_cone_detector:
 
   # Parameters for Open3D DBSCAN clustering
   # Epsilon value
-  dbscan_eps: 1.0
+  dbscan_eps: 0.06
   # Min points per cluster
-  dbscan_min_pts: 2
+  dbscan_min_pts: 5
