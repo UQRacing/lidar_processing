@@ -31,12 +31,14 @@ find_package(catkin REQUIRED COMPONENTS
     sensor_msgs
     visualization_msgs
     ddynamic_reconfigure
+    cv_bridge
 )
 
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(Open3D REQUIRED)
+find_package(OpenCV REQUIRED)
 
 ###################################
 ## catkin specific configuration ##
@@ -50,7 +52,7 @@ find_package(Open3D REQUIRED)
 catkin_package(
 #  INCLUDE_DIRS ${OMPL_INCLUDE_DIRS} ${GEOS_INCLUDE_DIRS}
 #  LIBRARIES lidar_cone_detection
-  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs visualization_msgs ddynamic_reconfigure
+  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs visualization_msgs ddynamic_reconfigure cv_bridge
 #  DEPENDS
 )
 
@@ -66,6 +68,7 @@ include_directories(
     ${Eigen3_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIR}
     ${Open3D_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Declare a C++ executable
@@ -83,4 +86,5 @@ target_link_libraries(lidar_cone_detection
     Eigen3::Eigen
     ${Boost_LIBRARY_DIR}
     Open3D::Open3D
+    ${OpenCV_LIBS}
 )

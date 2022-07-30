@@ -10,32 +10,5 @@ lidar_cone_detector:
   # Whether to display the Open3D debug UI or not (if such a thing is implemented)
   debug_ui: true
 
-  # Each block below corresponds to a stage of the cone detection pipeline.
-  # The blocks are ordered chronologically.
-
-  # Parameters for Open3D plane segmentation
-  # Max distance a point can be from the plane model, and still be considered an inlier.
-  plane_dist_thresh: 0.25
-  # Number of initial points to be considered inliers in each iteration.
-  plane_ransac_n: 8
-  # (Maximum?) Number of RANSAC iterations to be performed
-  plane_num_iters: 100
-
-  # Parameters for OpenCV bounding box dimensions
-  bbox_min_x: -50
-  bbox_min_y: -10
-  bbox_min_z: -50
-
-  bbox_max_x: 50
-  bbox_max_y: 10
-  bbox_max_z: 50
-
-  # Parameters for Open3D voxel downsampling
-  # Voxel grid resolution (make it pretty high, this is done for performance reasons)
-  voxeliser_resolution: 0.1
-
-  # Parameters for Open3D DBSCAN clustering
-  # Epsilon value
-  dbscan_eps: 1.0
-  # Min points per cluster
-  dbscan_min_pts: 2
+  # Camera parameters
+  # TODO

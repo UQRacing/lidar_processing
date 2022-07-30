@@ -8,10 +8,12 @@
 #include <open3d/Open3D.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
+#include <opencv2/calib3d.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
 
 using namespace uqr;
-
-#define DEBUG_CROP 1
 
 // very lazily borrowed and reformatted from https://www.codespeedy.com/hsv-to-rgb-in-cpp/
 static Eigen::Matrix<double, 3, 1> hsvToRgb(double H, double S, double V) {
@@ -49,20 +51,8 @@ LidarConeDetector::LidarConeDetector(ros::NodeHandle &handle) {
     handle.getParam("/lidar_cone_detector/debug_ui", enableDebugUI);
     handle.getParam("/lidar_cone_detector/lidar_debug_pub", lidarDebugTopicName);
     handle.getParam("/lidar_cone_detector/detect_debug_pub", detectDebugTopicName);
-    handle.getParam("/lidar_cone_detector/plane_dist_thresh", planeDistThresh);
-    handle.getParam("/lidar_cone_detector/plane_ransac_n", planeRansacN);
-    handle.getParam("/lidar_cone_detector/plane_num_iters", planeNumIters);
-    handle.getParam("/lidar_cone_detector/voxeliser_resolution", voxeliserResolution);
-    handle.getParam("/lidar_cone_detector/dbscan_eps", dbscanEps);
-    handle.getParam("/lidar_cone_detector/dbscan_min_pts", dbscanMinPts);
 
-    // generated with python (probably a better way of doing this)
-    handle.getParam("/lidar_cone_detector/bbox_min_x", bboxMinX);
-    handle.getParam("/lidar_cone_detector/bbox_min_y", bboxMinY);
-    handle.getParam("/lidar_cone_detector/bbox_min_z", bboxMinZ);
-    handle.getParam("/lidar_cone_detector/bbox_max_x", bboxMaxX);
-    handle.getParam("/lidar_cone_detector/bbox_max_y", bboxMaxY);
-    handle.getParam("/lidar_cone_detector/bbox_max_z", bboxMaxZ);
+    // TODO load camera parameters from YAML
 
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarConeDetector::lidarCallback, this);
     // TODO conePub (figure out what message type we publish first, a point cloud?? bounding box?)
@@ -84,81 +74,31 @@ LidarConeDetector::LidarConeDetector(ros::NodeHandle &handle) {
     if (enableDebugUI) {
         // in case we want to do Open3D based debugging
     }
-
-    // setup ddynamic_reconfigure
-//    ddr.registerVariable("planeDistThresh", &planeDistThresh, "Plane distance threshold", 0.01, 2.0);
-//    ddr.registerVariable("planeRansacN", &planeRansacN, "Plane RANSAC count", 1, 100);
-//    ddr.registerVariable("planeNumIters", &planeNumIters, "Plane num iterations", 10, 512);
-
-    // generated with python
-    ddr.registerVariable("bbox_min_x", &bboxMinX, "LiDAR bounding box min x", -100.0, 100.0);
-    ddr.registerVariable("bbox_min_y", &bboxMinY, "LiDAR bounding box min y", -100.0, 100.0);
-    ddr.registerVariable("bbox_min_z", &bboxMinZ, "LiDAR bounding box min z", -100.0, 100.0);
-    ddr.registerVariable("bbox_max_x", &bboxMaxX, "LiDAR bounding box max x", -100.0, 100.0);
-    ddr.registerVariable("bbox_max_y", &bboxMaxY, "LiDAR bounding box max y", -100.0, 100.0);
-    ddr.registerVariable("bbox_max_z", &bboxMaxZ, "LiDAR bounding box max z", -100.0, 100.0);
-    ddr.publishServicesTopics();
 }
 
 void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
     auto start = ros::WallTime::now();
 
-    open3d::geometry::PointCloud cloud;
-    open3d_conversions::rosToOpen3d(rosCloud, cloud, true);
+    open3d::t::geometry::PointCloud cloud;
+    open3d_conversions::rosToOpen3d(rosCloud, cloud);
 
-    // crop point cloud
-    Eigen::Vector3d bboxMin(bboxMinX, bboxMinY, bboxMinZ); // TODO ddynamic_reconfigure
-    Eigen::Vector3d bboxMax(bboxMaxX, bboxMaxY, bboxMaxZ);
-    open3d::geometry::AxisAlignedBoundingBox bbox(bboxMin, bboxMax);
-    auto notGroundCloud = *cloud.Crop(bbox);
+    // FIXME load camera parameters (what is a good way to do this?)
+    //  subscribe to topic /camera/color/camera_info? (then what about when we don't use the RealSense)
+    //  use this: https://wiki.ros.org/camera_calibration_parsers ?
+    auto intrinsic = open3d::core::Tensor();
+    auto extrinsic = open3d::core::Tensor();
 
-#if !DEBUG_CROP
-    // DBSCAN is incredibly slow on large point clouds, so voxel downscale after segmentation. we don't
-    // downscale _before_ segmentation (yet), because I think RANSAC will be to inaccurate then and destroy
-    // potential cones in the process.
-    // statistical/radius outlier removal would also help, but it appears to be even slower
-    auto reduced = *notGroundCloud.VoxelDownSample(voxeliserResolution);
+    // project lidar points onto camera plane to generate depth image
+    // TODO tune the last two parameters: depth scale and max depth
+    // TODO we could use opencv for this, cv::projectPoints, but the arguments are more confusing
+    auto depthImage = cloud.ProjectToDepthImage(1280, 720,
+                                                intrinsic, extrinsic, 1000.0f, 30.0f);
 
-    // cluster with DBSCAN
-    auto clusteredReduced = reduced.ClusterDBSCAN(dbscanEps, dbscanMinPts);
-#endif
+    // convert Open3D depth image to OpenCV
 
-    // publish lidar debug
-    if (!lidarDebugTopicName.empty()) {
-        sensor_msgs::PointCloud2 rosDebugCloud{};
+    // interpolate the depth image (inpaint?)
 
-#if !DEBUG_CROP
-        // map DBSCAN clusters to colour
-        int numClusters = *std::max_element(clusteredReduced.begin(), clusteredReduced.end());
-//        ROS_INFO("max clusters %d", numClusters);
-
-        for (int i : clusteredReduced) {
-            Eigen::Matrix<double, 3, 1> colour;
-            if (i == -1) {
-                // noise point
-                colour << 1, 1, 1;
-            } else {
-                // assign colour based on topic, use HSV and set hue based on which cluster it is
-                double h = ((double) i / (double) numClusters) * 360.0;
-                colour = hsvToRgb(h, 100.0, 100.0);
-            }
-            reduced.colors_.emplace_back(colour);
-        }
-
-        // publish the inliers of the plane model as a separate cloud
-        open3d_conversions::open3dToRos(reduced, rosDebugCloud, "laser_link");
-        lidarDebugPub.publish(rosDebugCloud);
-#else
-        // publish the full cloud for debugging the crop
-        open3d_conversions::open3dToRos(notGroundCloud, rosDebugCloud, "laser_link");
-        lidarDebugPub.publish(rosDebugCloud);
-#endif
-    }
-
-    // publish detect debug
-    if (!lidarDebugTopicName.empty()) {
-        // TODO
-    }
+    // publish the depth image over ROS
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
     ROS_INFO("Lidar callback time: %.2f ms", time);
@@ -166,9 +106,13 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
 
 
 int main(int argc, char *argv[]) {
-    ros::init(argc, argv, "lidar_cone");
-    ROS_INFO("LiDAR Cone Detection v" LIDAR_CONE_VERSION ": Matt Young, Fahed Alhanaee, Riley Bowyer, Caleb Aitken, 2021-2022, UQRacing");
+    ros::init(argc, argv, "lidar_process");
+    ROS_INFO("LiDAR Processing v" LIDAR_CONE_VERSION ": Matt Young, Fahed Alhanaee, Riley Bowyer, Caleb Aitken, 2021-2022, UQRacing");
     open3d::PrintOpen3DVersion();
+    auto cvCpuFeatures = cv::getCPUFeaturesLine();
+    auto cvNumThreads = cv::getNumThreads();
+    auto cvVersion = cv::getVersionString();
+    ROS_INFO("Using OpenCV v%s with %d threads, features: %s", cvVersion.c_str(), cvNumThreads, cvCpuFeatures.c_str());
 
     ros::NodeHandle handle{};
     LidarConeDetector detector = LidarConeDetector(handle);
