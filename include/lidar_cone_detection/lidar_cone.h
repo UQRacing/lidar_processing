@@ -3,24 +3,31 @@
 #pragma once
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
+#include <image_geometry/pinhole_camera_model.h>
 
 namespace uqr {
-    class LidarConeDetector {
+    class LidarProcessing {
     public:
-        explicit LidarConeDetector(ros::NodeHandle &handle);
+        explicit LidarProcessing(ros::NodeHandle &handle);
 
     private:
-        ros::Subscriber lidarSub; // subscribe to cones
-        ros::Publisher conePub, lidarDebugPub, detectDebugPub; // publish detected cones
+        ros::Subscriber lidarSub, cameraInfoSub;
+        ros::Publisher lidarDebugPub, lidarDepthPub;
 
         // YAML parameters
         std::string lidarTopicName{};
-        std::string lidarDebugTopicName{}, detectDebugTopicName{};
-        bool enableDebugUI{};
+        std::string lidarDebugTopicName{};
+        std::string cameraInfoTopicName{};
+        std::string lidarDepthTopicName{};
 
         ddynamic_reconfigure::DDynamicReconfigure ddr{};
 
+        std::optional<image_geometry::PinholeCameraModel> camera{};
+        std::optional<sensor_msgs::CameraInfo> cameraInfo{};
+
         void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud);
+        void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &msg);
     };
 }

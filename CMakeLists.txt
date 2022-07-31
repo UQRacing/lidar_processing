@@ -14,7 +14,7 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     add_link_options(-flto)
 else()
     message(STATUS "Debug build, enabling sanitizers")
-    add_compile_options(-Og -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
+    add_compile_options(-O0 -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
 
@@ -32,6 +32,7 @@ find_package(catkin REQUIRED COMPONENTS
     visualization_msgs
     ddynamic_reconfigure
     cv_bridge
+    image_geometry
 )
 
 ## System dependencies are found with CMake's conventions
@@ -39,6 +40,7 @@ find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(Open3D REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(OpenMP REQUIRED)
 
 ###################################
 ## catkin specific configuration ##
@@ -52,7 +54,8 @@ find_package(OpenCV REQUIRED)
 catkin_package(
 #  INCLUDE_DIRS ${OMPL_INCLUDE_DIRS} ${GEOS_INCLUDE_DIRS}
 #  LIBRARIES lidar_cone_detection
-  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs visualization_msgs ddynamic_reconfigure cv_bridge
+  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs
+    visualization_msgs ddynamic_reconfigure cv_bridge image_geometry
 #  DEPENDS
 )
 
@@ -87,4 +90,5 @@ target_link_libraries(lidar_cone_detection
     ${Boost_LIBRARY_DIR}
     Open3D::Open3D
     ${OpenCV_LIBS}
+    OpenMP::OpenMP_CXX
 )

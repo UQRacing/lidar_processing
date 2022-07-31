@@ -1,14 +1,15 @@
 # LiDAR cone detector configuration file
 
-lidar_cone_detector:
+lidar_processing:
   # Topic to receive PointCloud2 LiDAR data from
   lidar_topic: "/lslidar_point_cloud"
+
   # Topic to publish debug point cloud to, if empty string debug then topic is disabled
   lidar_debug_pub: "/lidar_cone/debug"
-  # Topic to publish debug marker array of detected cones to, if empty string then topic is disabled
-  detect_debug_pub: "/lidar_cone/debug_detect"
-  # Whether to display the Open3D debug UI or not (if such a thing is implemented)
-  debug_ui: true
+
+  # Topic to publish the depth images to
+  lidar_depth_pub: "/lidar_cone/depth"
 
   # Camera parameters
-  # TODO
+  # Name of the topic we receive CameraInfo messages from
+  camera_info_topic: "/camera/color/camera_info"
