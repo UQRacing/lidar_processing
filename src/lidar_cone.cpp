@@ -103,18 +103,23 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     // first argument in the pair is the point, second argument is the distance from the lidar to
     // this point (before it was projected into 2D)
     std::vector<CamPointPair_t> camPoints{};
-    // we could use pragma omp parallel for here!
+    double missedPoints = 0.0;
+    double totalPoints = 0.0;
+    // TODO use omp parallel for here (it causes a segfault rn)
     for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
         // thank you krok whiteboard!!! the bizarre camera frame is INDEED y,z,x
         float lx = *iter_y;
         float ly = *iter_z;
         float lz = *iter_x;
         cv::Point3d lidarPoint(lx, ly, lz);
+        totalPoints++;
 
         // project the point, and store it in the depth image as a pixel
         auto camPoint = camera->project3dToPixel(lidarPoint);
         if (camPoint.x < 0 || camPoint.y < 0 || camPoint.x > width || camPoint.y > height) {
-            // point out of bounds, TODO check if this really happens
+            // point out of bounds
+            // TODO why does this still happen??
+            missedPoints++;
             continue;
         }
         // distance between lidar (origin) and point
@@ -122,9 +127,12 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         camPoints.emplace_back(std::make_pair(camPoint, dist));
     }
 
+    ROS_INFO("Missed points: %.2f%%", (missedPoints / totalPoints) * 100.0);
+
     // first find the max and min distance, so we can lerp
     // std::minmax_element is giving me grief, so we do this manually
     double minDist = 999999, maxDist = -999999;
+#pragma omp parallel for default(none) shared(camPoints, minDist, maxDist)
     for (const auto &element : camPoints) {
         // compare by distance
         auto dist = element.second;
@@ -136,13 +144,14 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     }
 
     // write pixels to pix buf with correct intensities based on depth
+#pragma omp parallel for default(none) shared(camPoints, pixels, minDist, maxDist)
     for (const auto &pair : camPoints) {
         auto [camPoint, dist] = pair;
         auto camX = static_cast<size_t>(camPoint.x);
         auto camY = static_cast<size_t>(camPoint.y);
         // map lidar distance range to 0-255 for depth image
         double depth = mapRange(minDist, maxDist, 0, 255, pair.second);
-        pixels[camY][camX] = static_cast<uint8_t>(round(depth));
+        pixels[camY][camX] = static_cast<uint8_t>(floor(depth));
     }
 
     // create OpenCV depth mat (no copy! wow!) https://stackoverflow.com/a/44453382/5007892
