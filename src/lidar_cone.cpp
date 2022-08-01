@@ -17,6 +17,7 @@
 #include <cv_bridge/cv_bridge.h>
 
 using namespace uqr;
+using namespace open3d;
 
 typedef std::pair<cv::Point2d, double> CamPointPair_t;
 
@@ -83,102 +84,48 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         ROS_WARN("Cannot generate depth buffer, still waiting for camera info!");
         return;
     }
-
-    // project points to 3D image using image_geometry
-    // reference: https://github.com/mikeferguson/ros2_cookbook/blob/main/rclcpp/pcl.md
-    sensor_msgs::PointCloud2ConstIterator<float> iter_x(*rosCloud, "x");
-    sensor_msgs::PointCloud2ConstIterator<float> iter_y(*rosCloud, "y");
-    sensor_msgs::PointCloud2ConstIterator<float> iter_z(*rosCloud, "z");
-
-    // depth image is greyscale, single channel
     int width = static_cast<int>(cameraInfo->width);
     int height = static_cast<int>(cameraInfo->height);
 
-    // since the depthImage will be a UMat, be on the GPU, so we want to do one "bulk upload" rather
-    // than set each pixel individually
-    // TODO check this is the right format (row major)
-    uint8_t pixels[height][width];
-    std::memset(pixels, 0, width * height * sizeof(uint8_t));
+    // convert ROS point cloud to Open3D
+    t::geometry::PointCloud cloud;
+    open3d_conversions::rosToOpen3d(rosCloud, cloud);
 
-    // first argument in the pair is the point, second argument is the distance from the lidar to
-    // this point (before it was projected into 2D)
-    std::vector<CamPointPair_t> camPoints{};
-    double missedPoints = 0.0;
-    double totalPoints = 0.0;
-    // TODO use omp parallel for here (it causes a segfault rn)
-    for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
-        // thank you krok whiteboard!!! the bizarre camera frame is INDEED y,z,x
-        float lx = *iter_y;
-        float ly = *iter_z;
-        float lz = *iter_x;
-        cv::Point3d lidarPoint(lx, ly, lz);
-        totalPoints++;
+    // correct point cloud height
+    // offset height by about +1.2 (TODO configure in YAML)
+    auto correction = core::Tensor::Init({0.0, 0.0, 1.2});
+    cloud = cloud.Translate(correction);
 
-        // project the point, and store it in the depth image as a pixel
-        auto camPoint = camera->project3dToPixel(lidarPoint);
-        if (camPoint.x < 0 || camPoint.y < 0 || camPoint.x > width || camPoint.y > height) {
-            // point out of bounds
-            // TODO why does this still happen??
-            missedPoints++;
-            continue;
-        }
-        // distance between lidar (origin) and point
-        auto dist = cv::norm(lidarPoint);
-        camPoints.emplace_back(std::make_pair(camPoint, dist));
-    }
+    // TODO also do occlusion culling to save compute time
 
-    ROS_INFO("Missed points: %.2f%%", (missedPoints / totalPoints) * 100.0);
+    // setup camera matrix in Open3D
+    // TODO currently intrinsics come from the ros topic but would make sense to load it from disk instead
+    auto intrinsics = core::Tensor::Init({
+                                                 { camera->fx(), 0.0, camera->cx() },
+                                                 { 0.0, camera->fy(), camera->cy() },
+                                                 { 0.0, 0.0,          1.0 }
+                                         }, core::Device("CPU:0"));
+    ROS_INFO("Camera intrinsics:\n%s", intrinsics.ToString().c_str());
+    // TODO set extrinsics?
+    auto extrinsics = core::Tensor::Eye(4, core::Float32, core::Device("CPU:0"));
 
-    // first find the max and min distance, so we can lerp
-    // std::minmax_element is giving me grief, so we do this manually
-    double minDist = 999999, maxDist = -999999;
-#pragma omp parallel for default(none) shared(camPoints, minDist, maxDist)
-    for (const auto &element : camPoints) {
-        // compare by distance
-        auto dist = element.second;
-        if (dist < minDist) {
-            minDist = dist;
-        } else if (dist > maxDist) {
-            maxDist = dist;
-        }
-    }
-
-    // write pixels to pix buf with correct intensities based on depth
-#pragma omp parallel for default(none) shared(camPoints, pixels, minDist, maxDist)
-    for (const auto &pair : camPoints) {
-        auto [camPoint, dist] = pair;
-        auto camX = static_cast<size_t>(camPoint.x);
-        auto camY = static_cast<size_t>(camPoint.y);
-        // map lidar distance range to 0-255 for depth image
-        double depth = mapRange(minDist, maxDist, 0, 255, pair.second);
-        pixels[camY][camX] = static_cast<uint8_t>(floor(depth));
-    }
+    // project points to 3D image using Open3D
+    auto o3dDepth = cloud.ProjectToDepthImage(width, height, intrinsics, extrinsics, 1000.0f, 25.0f);
+    auto colorised = o3dDepth.ColorizeDepth(2.0f, 0.0f, 25.0f);
 
     // create OpenCV depth mat (no copy! wow!) https://stackoverflow.com/a/44453382/5007892
-    cv::Mat depthImage(height, width, CV_8UC1, pixels);
-
-#if 0
-    // old method
-    // load camera parameters (what is a good way to do this?)
-    //  use this: https://wiki.ros.org/camera_calibration_parsers ?
-    auto intrinsic = open3d::core::Tensor();
-    auto extrinsic = open3d::core::Tensor();
-
-    // project lidar points onto camera plane to generate depth image
-    // - tune the last two parameters: depth scale and max depth
-    // - we could use opencv for this, cv::projectPoints, but the arguments are more confusing
-    auto depthImage = cloud.ProjectToDepthImage(1280, 720,
-                                                intrinsic, extrinsic, 1000.0f, 30.0f);
-
-    // convert Open3D depth image to OpenCV
-#endif
+    // put in the OpenCV data directly
+    cv::Mat depthImage(height, width, CV_32FC1, o3dDepth.GetDataPtr());
+    cv::Mat colorisedDepthImage(height, width, CV_8UC3, colorised.GetDataPtr());
 
     // interpolate the depth image (inpaint? or use one of the papers in my firefox tabs)
 
     // publish the depth image over ROS
     auto cvImage = cv_bridge::CvImage();
     cvImage.image = depthImage;
-    cvImage.encoding = sensor_msgs::image_encodings::TYPE_8UC1;
+    cvImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+//    cvImage.image = colorisedDepthImage;
+//    cvImage.encoding = sensor_msgs::image_encodings::RGB8;
     lidarDepthPub.publish(cvImage.toImageMsg());
     // TODO also published compressed?
 
