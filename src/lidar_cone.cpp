@@ -171,9 +171,33 @@ void LidarConeDetector::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &ro
 
     // publish detect debug
     if (!lidarDebugTopicName.empty()) {
-        // TODO
-    }
+	visualization_msgs::MarkerArray ConesMarkers;
+	for (int i = 0; i < centers.size(); i++) {
+	    visualization_msgs::Marker marker;
+	    marker.header.frame_id = "laser_link";
+	    marker.header.stamp = ros::Time();
+	    marker.ns = "Cones";
+	    marker.id = i;
+	    marker.type = visualization_msgs::Marker::CYLINDER;
+	    marker.action = visualization_msgs::Marker::ADD;
 
+	    marker.scale.x = 0.15;
+	    marker.scale.y = 0.15;
+	    marker.scale.z = 0.3;
+	    marker.color.a = 1.0;
+	    marker.color.b = 1.0;
+	    marker.pose.orientation.w = 1.0;
+
+	    marker.lifetime  = ros::Duration(0.3);
+
+	    marker.pose.position.x = centers[i].x();
+	    marker.pose.position.y = centers[i].y();
+	    marker.pose.position.z = centers[i].z();
+	    ConesMarkers.markers.push_back(marker);
+	}
+	detectDebugPub.publish(ConesMarkers);
+    }
+     
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
     ROS_INFO("Lidar callback time: %.2f ms", time);
 }
