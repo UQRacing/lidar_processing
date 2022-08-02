@@ -7,6 +7,9 @@
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 #include <image_geometry/pinhole_camera_model.h>
 
+#define DEG_RAD 0.017453293
+#define RAD_DEG 57.29578
+
 namespace uqr {
     class LidarProcessing {
     public:
