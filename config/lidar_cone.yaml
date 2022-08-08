@@ -8,7 +8,7 @@ lidar_processing:
   lidar_debug_pub: "/lidar_cone/debug"
 
   # Topic to publish the depth images to
-  lidar_depth_pub: "/lidar_cone/depth"
+  lidar_depth_pub: "/lidar_cone/depth/compressed"
 
   # Camera parameters
   # Name of the topic we receive CameraInfo messages from

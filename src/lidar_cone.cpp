@@ -19,17 +19,6 @@
 using namespace uqr;
 using namespace open3d;
 
-/**
- * Constructs a 3x3 rotation matrix via macro trolling
- * @param mat name of the Open3D tensor to set
- * @param var name of the input angle variable in radians
- */
-#define SET_ROT_MAT(mat, var) \
-    (mat)[1][1] = cos(var); \
-    (mat)[1][2] = -sin(var); \
-    (mat)[2][1] = sin(var); \
-    (mat)[2][2] = cos(var); \
-
 // very lazily borrowed and reformatted from https://www.codespeedy.com/hsv-to-rgb-in-cpp/
 static Eigen::Matrix<double, 3, 1> hsvToRgb(double H, double S, double V) {
     if (H > 360 || H < 0 || S > 100 || S < 0 || V > 100 || V < 0) {
@@ -69,14 +58,7 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
 
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarProcessing::lidarCallback, this);
     cameraInfoSub = handle.subscribe(cameraInfoTopicName, 1, &LidarProcessing::cameraInfoCallback, this);
-    lidarDepthPub = handle.advertise<sensor_msgs::Image>(lidarDepthTopicName, 1);
-
-    if (!lidarDebugTopicName.empty()) {
-        ROS_INFO("Publishing lidar debug to topic %s", lidarDebugTopicName.c_str());
-        lidarDebugPub = handle.advertise<sensor_msgs::Image>(lidarDebugTopicName, 1);
-    } else {
-        ROS_INFO("Lidar debug publishing disabled by config");
-    }
+    lidarDepthPub = handle.advertise<sensor_msgs::CompressedImage>(lidarDepthTopicName, 1);
 }
 
 // This is a straightforward port of Tom's VAPE code, with some minor improvements.
@@ -96,6 +78,8 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
 static core::Tensor constructRotationMatrix(double xtheta, double ytheta, double ztheta) {
     // references:
     // - https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
+    // - https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula (I believe this is what we are doing)
+    // - cv::Rodrigues
 
     double xthetaRad = xtheta * DEG_RAD;
     double ythetaRad = ytheta * DEG_RAD;
@@ -122,10 +106,11 @@ static core::Tensor constructRotationMatrix(double xtheta, double ytheta, double
     zRotMat[1][1] = cos(zthetaRad);
 
     /*
-     * the rotation matrix we want is this:
-     * array([[ 0.99978068,  0.        , -0.02094242],
-       [ 0.        ,  1.        ,  0.        ],
-       [ 0.02094242,  0.        ,  0.99978068]])
+     the rotation matrix we want is this:
+     [[ 0.99978068  0.         -0.02094242]
+     [ 0.          1.          0.        ]
+     [ 0.02094242  0.          0.99978068]]
+     which we now have
      */
 
     return (xRotMat.Matmul(yRotMat)).Matmul(zRotMat);
@@ -163,7 +148,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     // camera rotation parameters
     double Rx = 0.0;
     double Ry = -1.2;
-    double Rz = 0.03;
+    double Rz = 0.0;
     auto rotation = constructRotationMatrix(Rx, Ry, Rz);
 
     // camera translation parameters
@@ -188,23 +173,24 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     // TODO do frustum culling here to save time (omit points not in camera frustum)
 
     // project points to 3D image using Open3D
-    auto o3dDepth = cloud.ProjectToDepthImage(width, height, intrinsics, extrinsics, 1000.0f, 25.0f);
-    auto colorised = o3dDepth.ColorizeDepth(2.0f, 0.0f, 25.0f);
+    auto o3dDepth = cloud.ProjectToDepthImage(width, height, intrinsics, extrinsics, 1000.0f, 20.0f);
 
     // create OpenCV depth mat (no copy! wow!) https://stackoverflow.com/a/44453382/5007892
     cv::Mat depthImage(height, width, CV_32FC1, o3dDepth.GetDataPtr());
-    cv::Mat colorisedDepthImage(height, width, CV_8UC3, colorised.GetDataPtr());
+    // ROS is outrageously stupid (as usual), we can't publish compressed as CV_32FC1, so we have
+    // to do an expensive copy here
+    // TODO force ROS to be less fucking stupid and skip this copy
+    cv::Mat publishImage(height, width, CV_8UC1);
+    depthImage.copyTo(publishImage);
 
     // interpolate the depth image (inpaint? or use one of the papers in my firefox tabs)
 
-    // publish the depth image over ROS
+    // publish the depth image over ROS (compressed using PNG, with JPEG we may get too much inaccuracy
+    // looking it up later)
     auto cvImage = cv_bridge::CvImage();
-    cvImage.image = depthImage;
-    cvImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-//    cvImage.image = colorisedDepthImage;
-//    cvImage.encoding = sensor_msgs::image_encodings::RGB8;
-    // FIXME stupid sack of shit won't let us publish compressed because it's a moron, but we DO want to do this
-    lidarDepthPub.publish(cvImage.toImageMsg());
+    cvImage.image = publishImage;
+    cvImage.encoding = sensor_msgs::image_encodings::MONO8;
+    lidarDepthPub.publish(cvImage.toCompressedImageMsg(cv_bridge::Format::PNG));
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
     ROS_INFO("Lidar callback time: %.2f ms", time);
