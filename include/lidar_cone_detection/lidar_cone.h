@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/CompressedImage.h>
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 #include <image_geometry/pinhole_camera_model.h>
 
@@ -16,7 +17,7 @@ namespace uqr {
         explicit LidarProcessing(ros::NodeHandle &handle);
 
     private:
-        ros::Subscriber lidarSub, cameraInfoSub;
+        ros::Subscriber lidarSub, cameraInfoSub, cameraFrameSub;
         ros::Publisher lidarDebugPub, lidarDepthPub;
 
         // YAML parameters
@@ -29,8 +30,10 @@ namespace uqr {
 
         std::optional<image_geometry::PinholeCameraModel> camera{};
         std::optional<sensor_msgs::CameraInfo> cameraInfo{};
+        std::optional<cv::Mat> lastCameraFrame{}; // only used for debug
 
         void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud);
         void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &msg);
+        void cameraFrameCallback(const sensor_msgs::CompressedImageConstPtr &image);
     };
 }

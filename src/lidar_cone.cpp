@@ -16,37 +16,25 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 
+// colour maps
+#include "lidar_cone_detection/turbo_colourmap.inc"
+
 using namespace uqr;
 using namespace open3d;
 
-// very lazily borrowed and reformatted from https://www.codespeedy.com/hsv-to-rgb-in-cpp/
-static Eigen::Matrix<double, 3, 1> hsvToRgb(double H, double S, double V) {
-    if (H > 360 || H < 0 || S > 100 || S < 0 || V > 100 || V < 0) {
-        throw std::invalid_argument("Invalid HSV");
-    }
-    double s = S / 100;
-    double v = V / 100;
-    double C = s * v;
-    double X = C * (1.0 - std::abs(std::fmod(H / 60.0, 2.0) - 1.0));
-    double m = v - C;
-    double r, g, b;
-    if (H >= 0 && H < 60) {
-        r = C, g = X, b = 0;
-    } else if (H >= 60 && H < 120) {
-        r = X, g = C, b = 0;
-    } else if (H >= 120 && H < 180) {
-        r = 0, g = C, b = X;
-    } else if (H >= 180 && H < 240) {
-        r = 0, g = X, b = C;
-    } else if (H >= 240 && H < 300) {
-        r = X, g = 0, b = C;
-    } else {
-        r = C, g = 0, b = X;
-    }
-    Eigen::Matrix<double, 3, 1> out;
-    out << (r + m), (g + m), (b + m);
-    return out;
-}
+// Borrowed from the Python implementation:
+// https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
+// Modified by me to return BGR not RGB
+//static cv::Scalar turboInterpolate(double value) {
+//    double x = fmax(0.0, fmin(1.0, value));
+//    double a = static_cast<int>(x*255.0);
+//    double b = fmin(255.0, a + 1.0);
+//    double f = x*255.0 - a;
+//
+//    double rC = turbo_srgb_floats[a][0] + (turbo_srgb_floats[b][0] - turbo_srgb_floats[a][0]) * f;
+//    double gC = turbo_srgb_floats[a][1] + (turbo_srgb_floats[b][1] - turbo_srgb_floats[a][1]) * f;
+//    double bC = turbo_srgb_floats[a][2] + (turbo_srgb_floats[b][2] - turbo_srgb_floats[a][2]) * f;
+//}
 
 LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     if (!handle.getParam("/lidar_processing/lidar_topic", lidarTopicName)) {
@@ -59,12 +47,12 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarProcessing::lidarCallback, this);
     cameraInfoSub = handle.subscribe(cameraInfoTopicName, 1, &LidarProcessing::cameraInfoCallback, this);
     lidarDepthPub = handle.advertise<sensor_msgs::CompressedImage>(lidarDepthTopicName, 1);
+    cameraFrameSub = handle.subscribe("/camera/color/image_raw/compressed", 1, &LidarProcessing::cameraFrameCallback, this);
 }
 
 // This is a straightforward port of Tom's VAPE code, with some minor improvements.
 // Original code: https://github.com/UQRacing/VAPE/blob/master/src/main.py
-// TODO find out the maths behind this. I suspect we could clean up this function by doing it using
-//  a quaternion. I also think we could automate lidar-camera calibration but I need to read about that.
+// TODO automate lidar camera calibration
 
 /**
  * Constructs the rotation matrix of the lidar relative to the camera. All roations are in camera
@@ -75,7 +63,7 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
  * @param ztheta The rotation along the z axis (in degrees)
  * @return 3x3 matrix representing the 3 rotation vectors of the camera
  */
-static core::Tensor constructRotationMatrix(double xtheta, double ytheta, double ztheta) {
+static cv::Mat constructRotationMatrix(double xtheta, double ytheta, double ztheta) {
     // references:
     // - https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
     // - https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula (I believe this is what we are doing)
@@ -85,25 +73,17 @@ static core::Tensor constructRotationMatrix(double xtheta, double ytheta, double
     double ythetaRad = ytheta * DEG_RAD;
     double zthetaRad = ztheta * DEG_RAD;
 
-    auto xRotMat = core::Tensor::Eye(3, core::Dtype::Float64, core::Device("CPU:0"));
-    auto yRotMat = core::Tensor::Eye(3, core::Dtype::Float64, core::Device("CPU:0"));
-    auto zRotMat = core::Tensor::Eye(3, core::Dtype::Float64, core::Device("CPU:0"));
+    // construct rotation vector
+    auto rotationVector = cv::Mat(3, 1, CV_64F);
+    rotationVector.at<double>(0, 0) = xthetaRad;
+    rotationVector.at<double>(1, 0) = ythetaRad;
+    rotationVector.at<double>(0, 0) = zthetaRad;
+    auto rotationMatrix = cv::Mat(3, 3, CV_64F);
 
-    // there is no way to make this cleaner, don't even try
-    xRotMat[1][1] = cos(xthetaRad);
-    xRotMat[1][2] = -sin(xthetaRad);
-    xRotMat[2][1] = sin(xthetaRad);
-    xRotMat[2][2] = cos(xthetaRad);
+    // apply Rodrigues rotation formula to generate the rotation matrix
+    cv::Rodrigues(rotationVector, rotationMatrix);
 
-    yRotMat[0][0] = cos(ythetaRad);
-    yRotMat[0][2] = sin(ythetaRad);
-    yRotMat[2][0] = -sin(ythetaRad);
-    yRotMat[2][2] = cos(ythetaRad);
-
-    zRotMat[0][0] = cos(zthetaRad);
-    zRotMat[0][1] = -sin(zthetaRad);
-    zRotMat[1][0] = sin(zthetaRad);
-    zRotMat[1][1] = cos(zthetaRad);
+    return rotationMatrix;
 
     /*
      the rotation matrix we want is this:
@@ -112,76 +92,117 @@ static core::Tensor constructRotationMatrix(double xtheta, double ytheta, double
      [ 0.02094242  0.          0.99978068]]
      which we now have
      */
-
-    return (xRotMat.Matmul(yRotMat)).Matmul(zRotMat);
 }
 
 void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
     auto start = ros::WallTime::now();
 
-    if (!camera.has_value() || !cameraInfo.has_value()) {
+    if (!camera.has_value() || !cameraInfo.has_value() || !lastCameraFrame.has_value()) {
         ROS_WARN("Cannot generate depth buffer, still waiting for camera info!");
         return;
     }
     int width = static_cast<int>(cameraInfo->width);
     int height = static_cast<int>(cameraInfo->height);
 
-    // convert ROS point cloud to Open3D for processing
-    t::geometry::PointCloud cloud;
-    open3d_conversions::rosToOpen3d(rosCloud, cloud);
+    // iterate over point cloud and generate a list of points
+    std::vector<cv::Point3d> lidarPoints{};
+    // reference: https://github.com/mikeferguson/ros2_cookbook/blob/main/rclcpp/pcl.md
+    sensor_msgs::PointCloud2ConstIterator<float> iter_x(*rosCloud, "x");
+    sensor_msgs::PointCloud2ConstIterator<float> iter_y(*rosCloud, "y");
+    sensor_msgs::PointCloud2ConstIterator<float> iter_z(*rosCloud, "z");
+
+    // TODO use omp parallel for here (it causes a segfault rn)
+    for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
+        // I have no idea how Tom figured this out, but the transform is actually x, -z, y
+        // The Krok whiteboard said y, z, x which is wrong!
+        // Even Tom's inline code comment says y, z, x but that actual code is what we have here
+        // Absolutely insane and completely bizarre. Who knows.
+        float lx = *iter_x;
+        float ly = -(*iter_z);
+        float lz = *iter_y;
+
+        cv::Point3d lidarPoint(lx, ly, lz);
+        lidarPoints.emplace_back(lidarPoint);
+    }
 
     // calculate camera intrinsic matrix from received camera model
-    // TODO make intrinsics/extrinsic calibration its own function??
-    auto intrinsics = core::Tensor::Init({
-                                                 { camera->fx(), 0.0, camera->cx() },
-                                                 { 0.0, camera->fy(), camera->cy() },
-                                                 { 0.0, 0.0,          1.0 }
-                                         }, core::Device("CPU:0"));
-    ROS_INFO("Camera intrinsics:\n%s", intrinsics.ToString().c_str());
+    cv::Mat intrinsic = cv::Mat::zeros(3, 3, CV_64F);
+    // at(row, column) = at(y,x)
+    intrinsic.at<double>(0, 0) = camera->fx();
+    intrinsic.at<double>(0, 2) = camera->cx();
+    // next row
+    intrinsic.at<double>(1, 1) = camera->fy();
+    intrinsic.at<double>(1, 2) = camera->cy();
+    // next row
+    intrinsic.at<double>(2, 2) = 1.0;
+    /*
+     intrinsic matrix:
+     { camera->fx(), 0.0, camera->cx() },
+     { 0.0, camera->fy(), camera->cy() },
+     { 0.0, 0.0,          1.0 }
+     */
+    ROS_INFO_STREAM("Camera intrinsics:\n" << intrinsic);
 
-    // calculate extrinsic matrix (the hard part)
-    // extrinsic matrix references:
-    // - https://i.stack.imgur.com/AGwu9.jpg
-    // - https://developer.apple.com/documentation/avfoundation/avcameracalibrationdata/2881130-extrinsicmatrix
-    // - Tom's VAPE code (citation above)
+    // distortion coefficients
+    // these are from VAPE code
+    // TODO make these configurable in YAML
+    double distortionValues[] = {-0.05496145784854889, 0.06309773772954941,
+                                 -0.00040654116310179234, -0.0003133322752546519,
+                                 -0.0198691263794899};
+    auto distortion = cv::Mat(1, 5, CV_64F, distortionValues);
+
+    // setup the extrinsic parameters
     // TODO make these configurable in YAML
     // camera rotation parameters
     double Rx = 0.0;
     double Ry = -1.2;
     double Rz = 0.0;
-    auto rotation = constructRotationMatrix(Rx, Ry, Rz);
+    auto rotationMatrix = constructRotationMatrix(Rx, Ry, Rz);
 
     // camera translation parameters
     double Tx = 0.0;
     double Ty = 0.04;
     double Tz = 0.03;
-    auto translation = core::Tensor::Init({{Tx}, {Ty}, {Tz}});
-    ROS_INFO("\n\nRotation:\n%s\n\nTranslation:%s", rotation.ToString().c_str(),
-             translation.ToString().c_str());
+    double translationValues[] = {Tx, Ty, Tz};
+    auto translation = cv::Mat(1, 3, CV_64F, translationValues);
 
-    // construct the extrinsic matrix, which is the rotation matrix augmented with the camera
-    // transform vector (plus some identity row thing).
-    // random source on identity row: https://answers.unity.com/storage/temp/111020-matrix4x4-basic-info.png
-    // [ r0 r1 r2 | t0 ]
-    // [ r3 r4 r5 | t1 ]
-    // [ r6 r7 r8 | t2 ]
-    // [ 0  0  0  | 1  ]
-    auto identityRow = core::Tensor::Init({{0.0, 0.0, 0.0, 1.0}});
-    auto extrinsics = rotation.Append(translation, 1).Append(identityRow, 0);
-    ROS_INFO("\n\nExtrinsics:\n%s", extrinsics.ToString().c_str());
+    // get projected points
+    std::vector<cv::Point2d> imagePoints{};
+    ROS_INFO_STREAM("OpenCV matrices:\nobjectPoints:\nomitted\nrvec:\n" << rotationMatrix
+        << "\ntvec:\n" << translation << "\ncameraMatrix:\n" << intrinsic << "\ndistCoeffs:\n" << distortion);
+    cv::projectPoints(lidarPoints, rotationMatrix, translation, intrinsic, distortion, imagePoints);
+    ROS_INFO("Have %zu points", imagePoints.size());
 
-    // TODO do frustum culling here to save time (omit points not in camera frustum)
+    // construct depth image
+    cv::Mat depthImage(height, width, CV_8UC3);
+    for (size_t i = 0; i < imagePoints.size(); i++) {
+        auto dist = norm(lidarPoints[i]);
+        auto point = imagePoints[i];
+        // TODO make this configurable in YAML as well
+        // TODO should these be || or && ? I thought || but tom's code has &&
+        if ((point.x < 0 || point.x >= width) || (point.y < 0 || point.y >= height) || (dist < 0 || dist > 28)) {
+            // invalid point
+            continue;
+        }
 
-    // project points to 3D image using Open3D
-    auto o3dDepth = cloud.ProjectToDepthImage(width, height, intrinsics, extrinsics, 1000.0f, 20.0f);
+        // lookup intensity in Google's Turbo colour map
+        // TODO interpolate colours properly
+        auto colour = turbo_srgb_bytes[static_cast<size_t>(fmin(dist * 8, 255))];
+        // Turbo is RGB, but our Mat is BGR
 
-    // create OpenCV depth mat (no copy! wow!) https://stackoverflow.com/a/44453382/5007892
-    cv::Mat depthImage(height, width, CV_32FC1, o3dDepth.GetDataPtr());
-    // ROS is outrageously stupid (as usual), we can't publish compressed as CV_32FC1, so we have
-    // to do an expensive copy here
-    // TODO force ROS to be less fucking stupid and skip this copy
-    cv::Mat publishImage(height, width, CV_8UC1);
-    depthImage.copyTo(publishImage);
+        // sometimes causes heap buffer overflow according to ASan
+        /*auto x = static_cast<int>(point.x);
+        auto y = static_cast<int>(point.y);
+        depthImage.at<cv::Vec3b>(y, x)[0] = colour[2];
+        depthImage.at<cv::Vec3b>(y, x)[1] = colour[1];
+        depthImage.at<cv::Vec3b>(y, x)[2] = colour[0];*/
+
+        cv::circle(depthImage, point, 1, cv::Scalar(colour[2], colour[1], colour[0]));
+    }
+
+    // (debug only) overlay images on top of each other
+    cv::Mat publishImage(height, width, CV_8UC3);
+    cv::addWeighted(depthImage, 0.75, *lastCameraFrame, 0.4, 0.0, publishImage);
 
     // interpolate the depth image (inpaint? or use one of the papers in my firefox tabs)
 
@@ -189,7 +210,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     // looking it up later)
     auto cvImage = cv_bridge::CvImage();
     cvImage.image = publishImage;
-    cvImage.encoding = sensor_msgs::image_encodings::MONO8;
+    cvImage.encoding = sensor_msgs::image_encodings::BGR8;
     lidarDepthPub.publish(cvImage.toCompressedImageMsg(cv_bridge::Format::PNG));
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
@@ -205,6 +226,11 @@ void LidarProcessing::cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &
     camera->fromCameraInfo(msg);
     cameraInfo = *msg;
     ROS_INFO("Received camera model");
+}
+
+void LidarProcessing::cameraFrameCallback(const sensor_msgs::CompressedImageConstPtr &image) {
+    lastCameraFrame = cv_bridge::toCvCopy(*image, "bgr8")->image;
+    ROS_INFO("Received camera frame");
 }
 
 
