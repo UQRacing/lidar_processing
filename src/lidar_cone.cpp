@@ -19,7 +19,16 @@
 using namespace uqr;
 using namespace open3d;
 
-typedef std::pair<cv::Point2d, double> CamPointPair_t;
+/**
+ * Constructs a 3x3 rotation matrix via macro trolling
+ * @param mat name of the Open3D tensor to set
+ * @param var name of the input angle variable in radians
+ */
+#define SET_ROT_MAT(mat, var) \
+    (mat)[1][1] = cos(var); \
+    (mat)[1][2] = -sin(var); \
+    (mat)[2][1] = sin(var); \
+    (mat)[2][2] = cos(var); \
 
 // very lazily borrowed and reformatted from https://www.codespeedy.com/hsv-to-rgb-in-cpp/
 static Eigen::Matrix<double, 3, 1> hsvToRgb(double H, double S, double V) {
@@ -70,19 +79,13 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     }
 }
 
-// source: https://github.com/libgdx/libgdx/blob/master/gdx/src/com/badlogic/gdx/math/MathUtils.java#L385
-static inline constexpr double mapRange(double inRangeStart, double inRangeEnd, double outRangeStart,
-                                        double outRangeEnd, double value) {
-    return outRangeStart + (value - inRangeStart) * (outRangeEnd - outRangeStart) / (inRangeEnd - inRangeStart);
-}
-
 // This is a straightforward port of Tom's VAPE code, with some minor improvements.
 // Original code: https://github.com/UQRacing/VAPE/blob/master/src/main.py
 // TODO find out the maths behind this. I suspect we could clean up this function by doing it using
 //  a quaternion. I also think we could automate lidar-camera calibration but I need to read about that.
 
 /**
- * Constructs the rotation vector of the lidar relative to the camera. All roations are in camera
+ * Constructs the rotation matrix of the lidar relative to the camera. All roations are in camera
  * space, not lidar.
  * Source: Tom's VAPE code.
  * @param xtheta The rotation along the x axis (in degrees)
@@ -91,39 +94,42 @@ static inline constexpr double mapRange(double inRangeStart, double inRangeEnd, 
  * @return 3x3 matrix representing the 3 rotation vectors of the camera
  */
 static core::Tensor constructRotationMatrix(double xtheta, double ytheta, double ztheta) {
+    // references:
+    // - https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
+
     double xthetaRad = xtheta * DEG_RAD;
     double ythetaRad = ytheta * DEG_RAD;
     double zthetaRad = ztheta * DEG_RAD;
 
-    // FIXME this is completely wrong, did not copy the VAPE implementation correctly!
-    // references:
-    // - https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
-    auto xRotVec = core::Tensor::Init({
-                                              {cos(xthetaRad), -sin(xthetaRad)},
-                                              {sin(xthetaRad), cos(xthetaRad)}
-                                      });
-    auto yRotVec = core::Tensor::Init({
-                                              {cos(ythetaRad), -sin(ythetaRad)},
-                                              {sin(ythetaRad), cos(ythetaRad)}
-                                      });
-    auto zRotVec = core::Tensor::Init({
-                                              {cos(zthetaRad), -sin(zthetaRad)},
-                                              {sin(zthetaRad), cos(zthetaRad)}
-                                      });
-    return (xRotVec * yRotVec) * zRotVec;
-}
+    auto xRotMat = core::Tensor::Eye(3, core::Dtype::Float64, core::Device("CPU:0"));
+    auto yRotMat = core::Tensor::Eye(3, core::Dtype::Float64, core::Device("CPU:0"));
+    auto zRotMat = core::Tensor::Eye(3, core::Dtype::Float64, core::Device("CPU:0"));
 
-/**
- * Constructs the 4x4 camera matrix from a 3x3 rotation matrix (made using constructRotationMatrix)
- * and the x, y, z translation.
- * @param rotation 3x3 rotation
- * @param transX X translation of camera
- * @param transY Y translation of camera
- * @param transZ Z translation of camera
- * @return 4x4 camera extrinsic matrix
- */
-//static core::Tensor constructExtrinsicMatrix(const core::Tensor& rotation, double transX, double transY, double transZ) {
-//}
+    // there is no way to make this cleaner, don't even try
+    xRotMat[1][1] = cos(xthetaRad);
+    xRotMat[1][2] = -sin(xthetaRad);
+    xRotMat[2][1] = sin(xthetaRad);
+    xRotMat[2][2] = cos(xthetaRad);
+
+    yRotMat[0][0] = cos(ythetaRad);
+    yRotMat[0][2] = sin(ythetaRad);
+    yRotMat[2][0] = -sin(ythetaRad);
+    yRotMat[2][2] = cos(ythetaRad);
+
+    zRotMat[0][0] = cos(zthetaRad);
+    zRotMat[0][1] = -sin(zthetaRad);
+    zRotMat[1][0] = sin(zthetaRad);
+    zRotMat[1][1] = cos(zthetaRad);
+
+    /*
+     * the rotation matrix we want is this:
+     * array([[ 0.99978068,  0.        , -0.02094242],
+       [ 0.        ,  1.        ,  0.        ],
+       [ 0.02094242,  0.        ,  0.99978068]])
+     */
+
+    return (xRotMat.Matmul(yRotMat)).Matmul(zRotMat);
+}
 
 void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
     auto start = ros::WallTime::now();
@@ -140,8 +146,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     open3d_conversions::rosToOpen3d(rosCloud, cloud);
 
     // calculate camera intrinsic matrix from received camera model
-    // TODO currently intrinsics come from the ros topic but would make sense to load it from disk instead
-    // TODO make intrinsics/extrinsic calibration its own function
+    // TODO make intrinsics/extrinsic calibration its own function??
     auto intrinsics = core::Tensor::Init({
                                                  { camera->fx(), 0.0, camera->cx() },
                                                  { 0.0, camera->fy(), camera->cy() },
@@ -151,9 +156,9 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
 
     // calculate extrinsic matrix (the hard part)
     // extrinsic matrix references:
-    // https://i.stack.imgur.com/AGwu9.jpg
-    // https://developer.apple.com/documentation/avfoundation/avcameracalibrationdata/2881130-extrinsicmatrix
-    // Tom's VAPE code (citation above)
+    // - https://i.stack.imgur.com/AGwu9.jpg
+    // - https://developer.apple.com/documentation/avfoundation/avcameracalibrationdata/2881130-extrinsicmatrix
+    // - Tom's VAPE code (citation above)
     // TODO make these configurable in YAML
     // camera rotation parameters
     double Rx = 0.0;
@@ -166,9 +171,19 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     double Ty = 0.04;
     double Tz = 0.03;
     auto translation = core::Tensor::Init({{Tx}, {Ty}, {Tz}});
-    ROS_INFO("Rotation:\n%s\nTranslation:%s", rotation.ToString().c_str(),
+    ROS_INFO("\n\nRotation:\n%s\n\nTranslation:%s", rotation.ToString().c_str(),
              translation.ToString().c_str());
-    auto extrinsics = rotation.Append(translation, -1);
+
+    // construct the extrinsic matrix, which is the rotation matrix augmented with the camera
+    // transform vector (plus some identity row thing).
+    // random source on identity row: https://answers.unity.com/storage/temp/111020-matrix4x4-basic-info.png
+    // [ r0 r1 r2 | t0 ]
+    // [ r3 r4 r5 | t1 ]
+    // [ r6 r7 r8 | t2 ]
+    // [ 0  0  0  | 1  ]
+    auto identityRow = core::Tensor::Init({{0.0, 0.0, 0.0, 1.0}});
+    auto extrinsics = rotation.Append(translation, 1).Append(identityRow, 0);
+    ROS_INFO("\n\nExtrinsics:\n%s", extrinsics.ToString().c_str());
 
     // TODO do frustum culling here to save time (omit points not in camera frustum)
 
@@ -188,8 +203,8 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     cvImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 //    cvImage.image = colorisedDepthImage;
 //    cvImage.encoding = sensor_msgs::image_encodings::RGB8;
+    // FIXME stupid sack of shit won't let us publish compressed because it's a moron, but we DO want to do this
     lidarDepthPub.publish(cvImage.toImageMsg());
-    // TODO also published compressed?
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
     ROS_INFO("Lidar callback time: %.2f ms", time);
