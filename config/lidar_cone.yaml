@@ -1,15 +1,25 @@
 # LiDAR cone detector configuration file
 
 lidar_processing:
+  ########## TOPICS ##########
   # Topic to receive PointCloud2 LiDAR data from
   lidar_topic: "/lslidar_point_cloud"
-
-  # Topic to publish debug point cloud to, if empty string debug then topic is disabled
-  lidar_debug_pub: "/lidar_cone/debug"
-
-  # Topic to publish the depth images to
+  # Topic to publish the depth images to. Compressed images only. Must end in /compressed.
   lidar_depth_pub: "/lidar_cone/depth/compressed"
-
-  # Camera parameters
-  # Name of the topic we receive CameraInfo messages from
+  # Topic we receive CameraInfo messages from
   camera_info_topic: "/camera/color/camera_info"
+
+  ########## PIPELINE SETTINGS ##########
+  # Depth image pipeline features
+  # Enable image dilation. Basically increases pixel size (makes it more chunky). Fast.
+  dilate: true
+  # Enable inpainting. Fills in missing details in the depth image. Very slow.
+  inpainting: false
+  # If true, publish a colour image (not useful for depth lookups, but good for debug/showing off).
+  publishColour: true
+
+  ########## DEBUG SETTINGS ##########
+  # Topic to debug pubilsh inpainting mask to. If empty, this is disabled.
+  inpainting_debug_pub: "/lidar_cone/inpaintingDebug/compressed"
+  # Topic we receive compressed camera frames from. Only for debug.
+  camera_frame_topic: "/camera/color/image_raw/compressed"

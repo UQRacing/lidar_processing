@@ -18,13 +18,17 @@ namespace uqr {
 
     private:
         ros::Subscriber lidarSub, cameraInfoSub, cameraFrameSub;
-        ros::Publisher lidarDebugPub, lidarDepthPub;
+        ros::Publisher lidarDepthPub;
+        std::optional<ros::Publisher> inpaintingDebugPub;
 
         // YAML parameters
         std::string lidarTopicName{};
         std::string lidarDebugTopicName{};
         std::string cameraInfoTopicName{};
         std::string lidarDepthTopicName{};
+
+        // pipeline configuration
+        bool inpainting = false, dilate = false, publishColour = false;
 
         ddynamic_reconfigure::DDynamicReconfigure ddr{};
 

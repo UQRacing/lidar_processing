@@ -15,26 +15,13 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
+#include <opencv2/xphoto.hpp>
 
 // colour maps
 #include "lidar_cone_detection/turbo_colourmap.inc"
 
 using namespace uqr;
 using namespace open3d;
-
-// Borrowed from the Python implementation:
-// https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
-// Modified by me to return BGR not RGB
-//static cv::Scalar turboInterpolate(double value) {
-//    double x = fmax(0.0, fmin(1.0, value));
-//    double a = static_cast<int>(x*255.0);
-//    double b = fmin(255.0, a + 1.0);
-//    double f = x*255.0 - a;
-//
-//    double rC = turbo_srgb_floats[a][0] + (turbo_srgb_floats[b][0] - turbo_srgb_floats[a][0]) * f;
-//    double gC = turbo_srgb_floats[a][1] + (turbo_srgb_floats[b][1] - turbo_srgb_floats[a][1]) * f;
-//    double bC = turbo_srgb_floats[a][2] + (turbo_srgb_floats[b][2] - turbo_srgb_floats[a][2]) * f;
-//}
 
 LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     if (!handle.getParam("/lidar_processing/lidar_topic", lidarTopicName)) {
@@ -43,21 +30,37 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     handle.getParam("/lidar_processing/lidar_debug_pub", lidarDebugTopicName);
     handle.getParam("/lidar_processing/camera_info_topic", cameraInfoTopicName);
     handle.getParam("/lidar_processing/lidar_depth_pub", lidarDepthTopicName);
+    auto inpaintingDebugTopicName = handle.param<std::string>("/lidar_processing/inpainting_debug_pub", "");
 
+    // pipeline features from YAML
+    handle.getParam("/lidar_processing/inpainting", inpainting);
+    handle.getParam("/lidar_processing/dilate", dilate);
+
+    // pub/sub topics
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarProcessing::lidarCallback, this);
     cameraInfoSub = handle.subscribe(cameraInfoTopicName, 1, &LidarProcessing::cameraInfoCallback, this);
     lidarDepthPub = handle.advertise<sensor_msgs::CompressedImage>(lidarDepthTopicName, 1);
     cameraFrameSub = handle.subscribe("/camera/color/image_raw/compressed", 1, &LidarProcessing::cameraFrameCallback, this);
+    if (!inpaintingDebugTopicName.empty()) {
+        ROS_INFO("Publishing inpainting debug to topic %s", inpaintingDebugTopicName.c_str());
+        inpaintingDebugPub = handle.advertise<sensor_msgs::CompressedImage>(inpaintingDebugTopicName, 1);
+    }
+
+    ROS_INFO("Pipeline features: inpainting: %s, dilation: %s", inpainting ? "yes" : "no", dilate ? "yes" : "no");
 }
 
 // This is a straightforward port of Tom's VAPE code, with some minor improvements.
 // Original code: https://github.com/UQRacing/VAPE/blob/master/src/main.py
 // TODO automate lidar camera calibration
 
+// source: https://github.com/libgdx/libgdx/blob/master/gdx/src/com/badlogic/gdx/math/MathUtils.java#L385
+static inline constexpr double mapRange(double inRangeStart, double inRangeEnd, double outRangeStart,
+                                        double outRangeEnd, double value) {
+    return outRangeStart + (value - inRangeStart) * (outRangeEnd - outRangeStart) / (inRangeEnd - inRangeStart);
+}
+
 /**
- * Constructs the rotation matrix of the lidar relative to the camera. All roations are in camera
- * space, not lidar.
- * Source: Tom's VAPE code.
+ * Uses Rodrigues' formula to turn a 3D rotation vector into a 3D rotation matrix.
  * @param xtheta The rotation along the x axis (in degrees)
  * @param ytheta The rotation along the y axis (in degrees)
  * @param ztheta The rotation along the z axis (in degrees)
@@ -74,24 +77,14 @@ static cv::Mat constructRotationMatrix(double xtheta, double ytheta, double zthe
     double zthetaRad = ztheta * DEG_RAD;
 
     // construct rotation vector
-    auto rotationVector = cv::Mat(3, 1, CV_64F);
-    rotationVector.at<double>(0, 0) = xthetaRad;
-    rotationVector.at<double>(1, 0) = ythetaRad;
-    rotationVector.at<double>(0, 0) = zthetaRad;
-    auto rotationMatrix = cv::Mat(3, 3, CV_64F);
+    double rotationValues[] = {xthetaRad, ythetaRad, zthetaRad};
+    auto rotationVector = cv::Mat(1, 3, CV_64F, rotationValues);
 
+    auto rotationMatrix = cv::Mat(3, 3, CV_64F);
     // apply Rodrigues rotation formula to generate the rotation matrix
     cv::Rodrigues(rotationVector, rotationMatrix);
 
     return rotationMatrix;
-
-    /*
-     the rotation matrix we want is this:
-     [[ 0.99978068  0.         -0.02094242]
-     [ 0.          1.          0.        ]
-     [ 0.02094242  0.          0.99978068]]
-     which we now have
-     */
 }
 
 void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
@@ -110,12 +103,10 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     sensor_msgs::PointCloud2ConstIterator<float> iter_x(*rosCloud, "x");
     sensor_msgs::PointCloud2ConstIterator<float> iter_y(*rosCloud, "y");
     sensor_msgs::PointCloud2ConstIterator<float> iter_z(*rosCloud, "z");
-
-    // TODO use omp parallel for here (it causes a segfault rn)
     for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
         // I have no idea how Tom figured this out, but the transform is actually x, -z, y
         // The Krok whiteboard said y, z, x which is wrong!
-        // Even Tom's inline code comment says y, z, x but that actual code is what we have here
+        // Even Tom's inline code comment says y, z, x but that actual code is what we have here.
         // Absolutely insane and completely bizarre. Who knows.
         float lx = *iter_x;
         float ly = -(*iter_z);
@@ -171,40 +162,91 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     ROS_INFO_STREAM("OpenCV matrices:\nobjectPoints:\nomitted\nrvec:\n" << rotationMatrix
         << "\ntvec:\n" << translation << "\ncameraMatrix:\n" << intrinsic << "\ndistCoeffs:\n" << distortion);
     cv::projectPoints(lidarPoints, rotationMatrix, translation, intrinsic, distortion, imagePoints);
-    ROS_INFO("Have %zu points", imagePoints.size());
 
-    // construct depth image
-    cv::Mat depthImage(height, width, CV_8UC3);
+    // find min and max depth (for interpolation)
+    // save computing depth twice, store it in a hash map
+    std::unordered_map<size_t, double> depthMappings{};
+    double minDist = 999999, maxDist = -999999;
+//#pragma omp parallel for default(none) shared(minDist, maxDist, depthMappings) firstprivate(imagePoints, lidarPoints, width, height)
     for (size_t i = 0; i < imagePoints.size(); i++) {
         auto dist = norm(lidarPoints[i]);
         auto point = imagePoints[i];
-        // TODO make this configurable in YAML as well
-        // TODO should these be || or && ? I thought || but tom's code has &&
-        if ((point.x < 0 || point.x >= width) || (point.y < 0 || point.y >= height) || (dist < 0 || dist > 28)) {
-            // invalid point
+        if (point.x < 0 || point.x >= width || point.y < 0 || point.y >= height) {
+            // invalid point (out of bounds of 2D image)
             continue;
         }
+        depthMappings[i] = dist;
+        if (dist < minDist) {
+            minDist = dist;
+        } else if (dist > maxDist) {
+            maxDist = dist;
+        }
+    }
+
+    // construct depth image
+    cv::Mat depthImage(height, width, CV_8UC3);
+    depthImage.setTo(cv::Scalar(0, 0, 0));
+    // mask of pixels not drawn in the depth image (white = not drawn, black = drawn over)
+    // used for inpainting later
+    cv::Mat pixelsNotDrawn = cv::Mat::zeros(height, width, CV_8UC1);
+    if (inpainting) pixelsNotDrawn.setTo(255);
+
+    // record min and max y written to the image, so we know in what range to interpolate
+    int minY = 9999, maxY = -9999;
+    for (size_t i = 0; i < imagePoints.size(); i++) {
+        auto point = imagePoints[i];
+        if (point.x < 0 || point.x >= width || point.y < 0 || point.y >= height) {
+            // invalid point (out of bounds of 2D image)
+            continue;
+        }
+        auto dist = depthMappings[i];
 
         // lookup intensity in Google's Turbo colour map
-        // TODO interpolate colours properly
-        auto colour = turbo_srgb_bytes[static_cast<size_t>(fmin(dist * 8, 255))];
-        // Turbo is RGB, but our Mat is BGR
-
-        // sometimes causes heap buffer overflow according to ASan
-        /*auto x = static_cast<int>(point.x);
+        auto colourIndex = floor(mapRange(minDist, maxDist, 0.0, 255.0, dist));
+        auto colour = turbo_srgb_bytes[static_cast<int>(colourIndex)];
+        auto x = static_cast<int>(point.x);
         auto y = static_cast<int>(point.y);
+        // Turbo is RGB, but our Mat is BGR, hence the indexing order
         depthImage.at<cv::Vec3b>(y, x)[0] = colour[2];
         depthImage.at<cv::Vec3b>(y, x)[1] = colour[1];
-        depthImage.at<cv::Vec3b>(y, x)[2] = colour[0];*/
+        depthImage.at<cv::Vec3b>(y, x)[2] = colour[0];
 
-        cv::circle(depthImage, point, 1, cv::Scalar(colour[2], colour[1], colour[0]));
+        if (y < minY) {
+            minY = y;
+        } else if (y > maxY) {
+            maxY = y;
+        }
+        // unset this area of the mask (we've filled it, so it shouldn't be inpainted)
+        if (inpainting) pixelsNotDrawn.at<uint8_t>(y, x) = 0;
+        //cv::circle(depthImage, point, 1, cv::Scalar(colour[2], colour[1], colour[0]));
+    }
+
+    // dilate the image
+    // TODO change dilation factor
+    if (dilate) {
+        cv::dilate(depthImage, depthImage, cv::Mat());
+    }
+
+    // now constrain the mask to only have the certain height band in the image that contains lidar pixels
+    // FIXME this over-estimates the y bounds leading to long inpaint times, reduce this!
+    //  - calculate minimum bounding polygon for the set of points
+    // TODO maybe use opencv's photo denoising algorithm instead of inpainting??
+    //  - i.e. fastNlMeansDenoisingColoredMulti
+    cv::Mat inpaintMask;
+    if (inpainting) {
+        cv::Mat yMask = cv::Mat::zeros(height, width, CV_8UC1);
+        cv::rectangle(yMask, cv::Point2i(0, minY), cv::Point2i(width, maxY), 255,
+                      cv::LineTypes::FILLED);
+        cv::bitwise_and(pixelsNotDrawn, yMask, inpaintMask);
+
+        // interpolate the depth image, currently using inpainting
+        cv::inpaint(depthImage, inpaintMask, depthImage, 4.0, cv::INPAINT_TELEA);
     }
 
     // (debug only) overlay images on top of each other
-    cv::Mat publishImage(height, width, CV_8UC3);
-    cv::addWeighted(depthImage, 0.75, *lastCameraFrame, 0.4, 0.0, publishImage);
-
-    // interpolate the depth image (inpaint? or use one of the papers in my firefox tabs)
+    auto publishImage = depthImage;
+//    cv::Mat publishImage(height, width, CV_8UC3);
+//    cv::addWeighted(inpainted, 0.95, *lastCameraFrame, 0.6, 0.0, publishImage);
 
     // publish the depth image over ROS (compressed using PNG, with JPEG we may get too much inaccuracy
     // looking it up later)
@@ -212,6 +254,14 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     cvImage.image = publishImage;
     cvImage.encoding = sensor_msgs::image_encodings::BGR8;
     lidarDepthPub.publish(cvImage.toCompressedImageMsg(cv_bridge::Format::PNG));
+
+    // publish inpainting debug if required
+    if (inpaintingDebugPub.has_value() && inpainting) {
+        auto debugImage = cv_bridge::CvImage();
+        debugImage.image = inpaintMask;
+        debugImage.encoding = sensor_msgs::image_encodings::MONO8;
+        inpaintingDebugPub->publish(debugImage.toCompressedImageMsg(cv_bridge::Format::PNG));
+    }
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
     ROS_INFO("Lidar callback time: %.2f ms", time);
