@@ -1,4 +1,4 @@
-// LiDAR cone detector (new version), main header
+// LiDAR processing (new version), main header
 // Matt Young, 2022, UQRacing
 #pragma once
 #include <ros/ros.h>

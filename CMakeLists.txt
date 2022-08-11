@@ -38,7 +38,6 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-find_package(Open3D REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(OpenMP REQUIRED)
 
@@ -70,14 +69,13 @@ include_directories(
     ${catkin_INCLUDE_DIRS}
     ${Eigen3_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIR}
-    ${Open3D_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(lidar_cone_detection src/lidar_cone.cpp src/open3d_conversions.cpp)
+add_executable(lidar_cone_detection src/lidar_cone.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
@@ -88,7 +86,6 @@ target_link_libraries(lidar_cone_detection
     ${catkin_LIBRARIES}
     Eigen3::Eigen
     ${Boost_LIBRARY_DIR}
-    Open3D::Open3D
     ${OpenCV_LIBS}
     OpenMP::OpenMP_CXX
 )

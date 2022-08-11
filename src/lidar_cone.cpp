@@ -4,8 +4,6 @@
 #include "lidar_cone_detection/defines.h"
 #include <ros/ros.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
-#include "lidar_cone_detection/open3d_conversions.h"
-#include <open3d/Open3D.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 #include <opencv2/calib3d.hpp>
@@ -14,11 +12,11 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
+#include "lidar_cone_detection/robin_hood.h"
 // colour maps
 #include "lidar_cone_detection/turbo_colourmap.inc"
 
 using namespace uqr;
-using namespace open3d;
 
 LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     if (!handle.getParam("/lidar_processing/lidar_topic", lidarTopicName)) {
@@ -32,6 +30,7 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     // pipeline features from YAML
     handle.getParam("/lidar_processing/inpainting", inpainting);
     handle.getParam("/lidar_processing/dilate", dilate);
+    handle.getParam("/lidar_processing/publishColour", publishColour);
 
     // pub/sub topics
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarProcessing::lidarCallback, this);
@@ -43,12 +42,13 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
         inpaintingDebugPub = handle.advertise<sensor_msgs::CompressedImage>(inpaintingDebugTopicName, 1);
     }
 
-    ROS_INFO("Pipeline features: inpainting: %s, dilation: %s", inpainting ? "yes" : "no", dilate ? "yes" : "no");
+    ROS_INFO("Pipeline features: inpainting: %s, dilation: %s, publish colour: %s",
+             inpainting ? "yes" : "no", dilate ? "yes" : "no", publishColour ? "yes" : "no");
 }
 
-// This is a straightforward port of Tom's VAPE code, with some minor improvements.
+// This part is a straightforward port of Tom's VAPE code, with some minor improvements.
 // Original code: https://github.com/UQRacing/VAPE/blob/master/src/main.py
-// TODO automate lidar camera calibration
+// TODO automate lidar extrinsic camera calibration
 
 // source: https://github.com/libgdx/libgdx/blob/master/gdx/src/com/badlogic/gdx/math/MathUtils.java#L385
 static inline constexpr double mapRange(double inRangeStart, double inRangeEnd, double outRangeStart,
@@ -97,10 +97,13 @@ static std::vector<cv::Point3d> generateLidarPoints(const sensor_msgs::PointClou
     sensor_msgs::PointCloud2ConstIterator<float> iter_y(*rosCloud, "y");
     sensor_msgs::PointCloud2ConstIterator<float> iter_z(*rosCloud, "z");
     for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
-        // I have no idea how Tom figured this out, but the transform is actually x, -z, y
-        // The Krok whiteboard said y, z, x which is wrong!
-        // Even Tom's inline code comment says y, z, x but that actual code is what we have here.
-        // Absolutely insane and completely bizarre. Who knows.
+        // I have no idea how Tom figured this out, but the transform is actually x,-z,y - even the
+        // magic Krok whiteboard said y,z,x which is wrong! In fact, even Tom's inline code comment
+        // says y,z,x, but the actual code implements what we have here: x,-z-y.
+        // Update from the man himself:
+        // It appears to be because the previous LiVox LiDAR used y,z,x but the LeiShen uses x,-z,y.
+        // Explains why both Krok whiteboard and Tom's code were wrong, because neither got updated
+        // when we moved to LeiShen. So there you go.
         float lx = *iter_x;
         float ly = -(*iter_z);
         float lz = *iter_y;
@@ -180,7 +183,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
 
     // find min and max depth (for interpolation)
     // save computing depth twice, store it in a hash map
-    std::unordered_map<size_t, double> depthMappings{};
+    robin_hood::unordered_map<size_t, double> depthMappings{};
     double minDist = 999999, maxDist = -999999;
     // cannot parallelise this, hashmap causes segfault :(
     for (size_t i = 0; i < imagePoints.size(); i++) {
@@ -329,8 +332,8 @@ void LidarProcessing::cameraFrameCallback(const sensor_msgs::CompressedImageCons
 
 int main(int argc, char *argv[]) {
     ros::init(argc, argv, "lidar_process");
-    ROS_INFO("LiDAR Processing v" LIDAR_CONE_VERSION ": Matt Young, Fahed Alhanaee, Riley Bowyer, Caleb Aitken, 2021-2022, UQRacing");
-    open3d::PrintOpen3DVersion();
+    ROS_INFO("LiDAR Processing v" LIDAR_PROCESSING_VERSION ": Matt Young, Fahed Alhanaee, Riley Bowyer, "
+                                                           "Caleb Aitken, 2021-2022, UQRacing");
     auto cvCpuFeatures = cv::getCPUFeaturesLine();
     auto cvNumThreads = cv::getNumThreads();
     auto cvVersion = cv::getVersionString();

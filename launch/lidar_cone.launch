@@ -1,5 +1,5 @@
-<!-- Launch file for lidar cone detector -->
+<!-- Launch file for lidar processing -->
 <launch>
-    <rosparam command="load" file="$(find lidar_cone_detection)/config/lidar_cone.yaml"/>
+    <rosparam command="load" file="$(find lidar_cone_detection)/config/lidar_processing.yaml"/>
     <node name="lidar_cone_detection" pkg="lidar_cone_detection" type="lidar_cone_detection" output="screen" />
 </launch>

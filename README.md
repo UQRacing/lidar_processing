@@ -1,24 +1,21 @@
-# LiDAR Cone Detection
-This is the new and improved LiDAR cone detection code, based on the work originally done by Riley
-Bowyer and Caleb Aitken in 2020-2021.
+# LiDAR Processing
+This is the new and improved LiDAR processing pipeline. It takes in a LiDAR point cloud, camera
+parameters, and spits out a depth image that can be used in combination with a 2D cone detector
+to estimate 3D cone positions. The code uses OpenCV
 
-Compared to the original, the following changes have been made:
+The original solution was to detect cones directly in the point cloud. This approach may still
+be used if the 2D cone detector is too inaccurate or slow.
 
-- Does not implement the custom UQR point cloud data type, it uses ROS & Open3D types directly
-- Only supports the LeiShen LiDAR used on the AV to simplify development
-- Uses Open3D instead of PCL, for a better API and more performance
-
-However, the general concept of ground plane segmentation to detect the cones is mostly left as-is.
-
-**Original authors:**
+**Original authors (2020-2021):**
 
 - Riley Bowyer (riley.d.bowyer@gmail.com)
 - Caleb Aitken
 
-**Next version authors:**
+**Next version authors (2022-):**
 
-- Matt Young (m.young2@uqconnect.edu.au)
-- Fahed Alhanaee
+- Matt Young (m.young2@uqconnect.edu.au): depth map generation code and optimisations
+- Tom Day: original Python VAPE code, which this repo is basically a C++ port of
+- Fahed Alhanaee: detecting cones in 3D point cloud (see the "open3d" branch)
 
 The current maintainer of the repo is Matt Young.
 
@@ -30,7 +27,7 @@ Install dependencies:
 - Install ddynamic_reconfigure: `sudo apt install ros-noetic-ddynamic-reconfigure`
 - Install OpenCV. Either use the system package or [compile from source](https://docs.opencv.org/4.x/d7/d9f/tutorial_linux_install.html). No
 contrib module is required.
-- Install Open3D. The recommended way is to
+- _(Not required)_ Install Open3D. The recommended way is to
 [click here](https://github.com/isl-org/Open3D/releases/download/v0.15.1/open3d-devel-linux-x86_64-cxx11-abi-0.15.1.tar.xz)
 to download a compiled build (30MB LZMA TAR). Then:
     1. Extract the contained folder to a directory of your choosing, I use ~/build
@@ -38,3 +35,7 @@ to download a compiled build (30MB LZMA TAR). Then:
     3. Copy directory open3d/lib/cmake/Open3D/ to /usr/local/lib/cmake/
     4. Copy directory open3d/include/open3d/ to /usr/local/include/
     5. Run `sudo ldconfig`
+
+You can edit parameters in config/lidar_processing.yaml, it's all documented inline.
+
+To run the pipeline use `roslaunch lidar_processing lidar_processing.launch`

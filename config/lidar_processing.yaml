@@ -1,4 +1,5 @@
 # LiDAR cone detector configuration file
+# Matt Young, 2022, UQRacing
 
 lidar_processing:
   ########## TOPICS ##########
@@ -10,23 +11,34 @@ lidar_processing:
   camera_info_topic: "/camera/color/camera_info"
 
   ########## PIPELINE SETTINGS ##########
-  # Depth image pipeline features
-  # Enable image dilation. Basically increases pixel size (makes it more chunky). Fast.
+  # Enable image dilate morphological operation. Basically increases pixel size (makes it more chunky). Fast.
   dilate: true
-  # Enable inpainting. Fills in missing details in the depth image. Very slow.
+  # Enable inpainting. Fills in missing details in the depth image. Very slow if used on whole frame.
   inpainting: true
   # If true, publish a colour image (not useful for depth lookups, but good for debug/showing off).
   publishColour: true
 
+  # Only inpaint within this ROI rectangle in the depth image to improve performance.
+  # Can be determined by saving an image, importing it into GIMP and using rectangle select tool.
+  # Format: x,y,width,height
+  inpaintRoi:
+    - 464
+    - 381
+    - 646
+    - 158
+
   ########## CAMERA PARAMETERS ##########
-  # Rotation vector
-  Rx: 0.0
-  Ry: -1.2
-  Rz: 0.0
-  # Translation vector
-  Tx: 0.0
-  Ty: 0.04
-  Tz: 0.03
+  # Extrinsic parameters
+  # Rotation vector (x,y,z)
+  rvec:
+    - 0.0
+    - 1.2
+    - 0.0
+  # Translation vector (x,y,z)
+  tvec:
+    - 0.0
+    - 0.04
+    - 0.03
 
   ########## DEBUG SETTINGS ##########
   # Topic to debug pubilsh inpainting mask to. If empty, this is disabled.

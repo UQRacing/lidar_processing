@@ -8,6 +8,6 @@ namespace uqr {
  * Version history:
  * v0.0.1: initial release
  */
-#define LIDAR_CONE_VERSION "0.0.1"
+#define LIDAR_PROCESSING_VERSION "0.0.1"
 
 };
