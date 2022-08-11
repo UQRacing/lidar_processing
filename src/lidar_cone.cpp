@@ -1,4 +1,4 @@
-// LiDAR cone detector (new version), main file
+// LiDAR processing (new version), main file
 // Matt Young, 2022, UQRacing
 #include "lidar_cone_detection/lidar_cone.h"
 #include "lidar_cone_detection/defines.h"
@@ -11,12 +11,9 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/opencv.hpp>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
-#include <opencv2/xphoto.hpp>
-
 // colour maps
 #include "lidar_cone_detection/turbo_colourmap.inc"
 
@@ -87,16 +84,12 @@ static cv::Mat constructRotationMatrix(double xtheta, double ytheta, double zthe
     return rotationMatrix;
 }
 
-void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
-    auto start = ros::WallTime::now();
-
-    if (!camera.has_value() || !cameraInfo.has_value() || !lastCameraFrame.has_value()) {
-        ROS_WARN("Cannot generate depth buffer, still waiting for camera info!");
-        return;
-    }
-    int width = static_cast<int>(cameraInfo->width);
-    int height = static_cast<int>(cameraInfo->height);
-
+/**
+ * Generates LiDAR points in correct coordinate space from a PointCloud2 message.
+ * @param rosCloud the point cloud 2 message
+ * @return list of points, for sending to OpenCV
+ */
+static std::vector<cv::Point3d> generateLidarPoints(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
     // iterate over point cloud and generate a list of points
     std::vector<cv::Point3d> lidarPoints{};
     // reference: https://github.com/mikeferguson/ros2_cookbook/blob/main/rclcpp/pcl.md
@@ -111,19 +104,24 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         float lx = *iter_x;
         float ly = -(*iter_z);
         float lz = *iter_y;
-
         cv::Point3d lidarPoint(lx, ly, lz);
         lidarPoints.emplace_back(lidarPoint);
     }
+    return lidarPoints;
+}
 
-    // calculate camera intrinsic matrix from received camera model
+/**
+ * Calculates camera intrinsic matrix from received camera model
+ * @return
+ */
+static cv::Mat calculateIntrinsics(const image_geometry::PinholeCameraModel &camera) {
     cv::Mat intrinsic = cv::Mat::zeros(3, 3, CV_64F);
     // at(row, column) = at(y,x)
-    intrinsic.at<double>(0, 0) = camera->fx();
-    intrinsic.at<double>(0, 2) = camera->cx();
+    intrinsic.at<double>(0, 0) = camera.fx();
+    intrinsic.at<double>(0, 2) = camera.cx();
     // next row
-    intrinsic.at<double>(1, 1) = camera->fy();
-    intrinsic.at<double>(1, 2) = camera->cy();
+    intrinsic.at<double>(1, 1) = camera.fy();
+    intrinsic.at<double>(1, 2) = camera.cy();
     // next row
     intrinsic.at<double>(2, 2) = 1.0;
     /*
@@ -132,7 +130,26 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
      { 0.0, camera->fy(), camera->cy() },
      { 0.0, 0.0,          1.0 }
      */
-    ROS_INFO_STREAM("Camera intrinsics:\n" << intrinsic);
+    return intrinsic;
+}
+
+void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
+    auto start = ros::WallTime::now();
+
+    if (!camera.has_value() || !cameraInfo.has_value() || !lastCameraFrame.has_value()) {
+        ROS_WARN("Cannot generate depth buffer, still waiting for camera info!");
+        return;
+    }
+    int width = static_cast<int>(cameraInfo->width);
+    int height = static_cast<int>(cameraInfo->height);
+
+    // TODO only calculate these camera matrices once
+
+    // generate lidar points
+    auto lidarPoints = generateLidarPoints(rosCloud);
+
+    // calculate intrinsics
+    auto intrinsic = calculateIntrinsics(*camera);
 
     // distortion coefficients
     // these are from VAPE code
@@ -159,15 +176,13 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
 
     // get projected points
     std::vector<cv::Point2d> imagePoints{};
-    ROS_INFO_STREAM("OpenCV matrices:\nobjectPoints:\nomitted\nrvec:\n" << rotationMatrix
-        << "\ntvec:\n" << translation << "\ncameraMatrix:\n" << intrinsic << "\ndistCoeffs:\n" << distortion);
     cv::projectPoints(lidarPoints, rotationMatrix, translation, intrinsic, distortion, imagePoints);
 
     // find min and max depth (for interpolation)
     // save computing depth twice, store it in a hash map
     std::unordered_map<size_t, double> depthMappings{};
     double minDist = 999999, maxDist = -999999;
-//#pragma omp parallel for default(none) shared(minDist, maxDist, depthMappings) firstprivate(imagePoints, lidarPoints, width, height)
+    // cannot parallelise this, hashmap causes segfault :(
     for (size_t i = 0; i < imagePoints.size(); i++) {
         auto dist = norm(lidarPoints[i]);
         auto point = imagePoints[i];
@@ -183,25 +198,23 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         }
     }
 
-    // construct depth image
+    // record min and max y written to the image, so we know in what range to interpolate (for inpainting)
+    int minY = 9999, maxY = -9999;
+
+    // big step: construct the depth image
     cv::Mat depthImage(height, width, CV_8UC3);
     depthImage.setTo(cv::Scalar(0, 0, 0));
-    // mask of pixels not drawn in the depth image (white = not drawn, black = drawn over)
-    // used for inpainting later
-    cv::Mat pixelsNotDrawn = cv::Mat::zeros(height, width, CV_8UC1);
-    if (inpainting) pixelsNotDrawn.setTo(255);
-
-    // record min and max y written to the image, so we know in what range to interpolate
-    int minY = 9999, maxY = -9999;
     for (size_t i = 0; i < imagePoints.size(); i++) {
         auto point = imagePoints[i];
         if (point.x < 0 || point.x >= width || point.y < 0 || point.y >= height) {
             // invalid point (out of bounds of 2D image)
             continue;
         }
+        // save a bit of time by looking up our previously calculated depth value
         auto dist = depthMappings[i];
 
         // lookup intensity in Google's Turbo colour map
+        // TODO only do this if colour requested
         auto colourIndex = floor(mapRange(minDist, maxDist, 0.0, 255.0, dist));
         auto colour = turbo_srgb_bytes[static_cast<int>(colourIndex)];
         auto x = static_cast<int>(point.x);
@@ -216,31 +229,61 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         } else if (y > maxY) {
             maxY = y;
         }
-        // unset this area of the mask (we've filled it, so it shouldn't be inpainted)
-        if (inpainting) pixelsNotDrawn.at<uint8_t>(y, x) = 0;
-        //cv::circle(depthImage, point, 1, cv::Scalar(colour[2], colour[1], colour[0]));
     }
 
-    // dilate the image
-    // TODO change dilation factor
+    // TODO make a UMat here and do processing on that from now onwards
+
+    // dilate the image if enabled
     if (dilate) {
-        cv::dilate(depthImage, depthImage, cv::Mat());
+        // instead of dilation, we actually use MORPH_CLOSE because it is better
+        //auto structuringElement = cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(8, 8));
+        //cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, structuringElement);
+        cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, cv::Mat());
     }
 
-    // now constrain the mask to only have the certain height band in the image that contains lidar pixels
-    // FIXME this over-estimates the y bounds leading to long inpaint times, reduce this!
-    //  - calculate minimum bounding polygon for the set of points
-    // TODO maybe use opencv's photo denoising algorithm instead of inpainting??
-    //  - i.e. fastNlMeansDenoisingColoredMulti
-    cv::Mat inpaintMask;
+    // run inpainting: like photoshop's content aware fill, slow, but yields to good results as it
+    // fills in missing depth pixels leading to a much denser image
+    // TODO instead of doing inpaint, maybe try force opencv to do bicubic interpolation (faster)
+    cv::Mat inpaintMask = cv::Mat::zeros(height, width, CV_8UC1);
     if (inpainting) {
-        cv::Mat yMask = cv::Mat::zeros(height, width, CV_8UC1);
-        cv::rectangle(yMask, cv::Point2i(0, minY), cv::Point2i(width, maxY), 255,
-                      cv::LineTypes::FILLED);
-        cv::bitwise_and(pixelsNotDrawn, yMask, inpaintMask);
+        // mask of pixels not drawn in the depth image (white = not drawn, black = drawn over)
+        cv::Mat pixelsNotDrawn = cv::Mat::zeros(height, width, CV_8UC1);
+        for (int y = 0; y < depthImage.rows; y++) {
+            for (int x = 0; x < depthImage.cols; x++) {
+                auto colour = depthImage.at<cv::Vec3b>(y, x);
+                if (colour[0] == 0 && colour[1] == 0 && colour[2] == 0) {
+                    // pixel has not been written! so it should be coloured white in the output!
+                    pixelsNotDrawn.at<uint8_t>(y, x) = 255;
+                }
+            }
+        }
+
+        // constrain region to inpaint into a manually calculated bounding box
+        // you can open the images in rqt and export them and use the rectangle select tool in GIMP
+        // to calculate these
+        // TODO define crop rect in YAML
+        cv::Rect crop(464, 381, 646, 158);
+        // TODO ideally we would use like pixelsNotDrawn(crop) but for god knows why it's not working
+        cv::Mat cropMask = cv::Mat::zeros(height, width, CV_8UC1);
+        cv::rectangle(cropMask, crop, 255,cv::LineTypes::FILLED);
+        // bitwise_and is faster than copyTo it seems
+        cv::bitwise_and(pixelsNotDrawn, cropMask, inpaintMask);
+
+        // TODO ideally everything outside of this crop rectangle gets "filled in" more inaccurately
+        //  probably using morphological operations (very large dilation)
 
         // interpolate the depth image, currently using inpainting
-        cv::inpaint(depthImage, inpaintMask, depthImage, 4.0, cv::INPAINT_TELEA);
+        cv::inpaint(depthImage, inpaintMask, depthImage, 4.0, cv::INPAINT_NS);
+
+#if 0
+        // blur experiment
+        inpaintMask = pixelsNotDrawn;
+        // copy the original image and blur it
+        cv::Mat blurImage;
+        cv::blur(depthImage, blurImage, cv::Size(32, 32));
+        // copy blurred pixels that were missing in the depth image back into the depth image
+        blurImage.copyTo(depthImage, inpaintMask);
+#endif
     }
 
     // (debug only) overlay images on top of each other
@@ -248,14 +291,14 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
 //    cv::Mat publishImage(height, width, CV_8UC3);
 //    cv::addWeighted(inpainted, 0.95, *lastCameraFrame, 0.6, 0.0, publishImage);
 
-    // publish the depth image over ROS (compressed using PNG, with JPEG we may get too much inaccuracy
-    // looking it up later)
+    // publish the depth image over ROS (compressed using PNG, with JPEG due to colour banding we
+    // would get too much inaccuracy for all the work we just did!)
     auto cvImage = cv_bridge::CvImage();
     cvImage.image = publishImage;
     cvImage.encoding = sensor_msgs::image_encodings::BGR8;
     lidarDepthPub.publish(cvImage.toCompressedImageMsg(cv_bridge::Format::PNG));
 
-    // publish inpainting debug if required
+    // publish inpainting debug if requested, and inpainting is enabled
     if (inpaintingDebugPub.has_value() && inpainting) {
         auto debugImage = cv_bridge::CvImage();
         debugImage.image = inpaintMask;
@@ -291,6 +334,7 @@ int main(int argc, char *argv[]) {
     auto cvCpuFeatures = cv::getCPUFeaturesLine();
     auto cvNumThreads = cv::getNumThreads();
     auto cvVersion = cv::getVersionString();
+//    ROS_INFO("OpenCV build info:\n%s", cv::getBuildInformation().c_str());
     ROS_INFO("Using OpenCV v%s with %d threads, features: %s", cvVersion.c_str(), cvNumThreads, cvCpuFeatures.c_str());
 
     ros::NodeHandle handle{};

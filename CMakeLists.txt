@@ -14,7 +14,7 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     add_link_options(-flto)
 else()
     message(STATUS "Debug build, enabling sanitizers")
-    add_compile_options(-O0 -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
+    add_compile_options(-Og -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
 

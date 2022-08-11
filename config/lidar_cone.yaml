@@ -14,9 +14,19 @@ lidar_processing:
   # Enable image dilation. Basically increases pixel size (makes it more chunky). Fast.
   dilate: true
   # Enable inpainting. Fills in missing details in the depth image. Very slow.
-  inpainting: false
+  inpainting: true
   # If true, publish a colour image (not useful for depth lookups, but good for debug/showing off).
   publishColour: true
+
+  ########## CAMERA PARAMETERS ##########
+  # Rotation vector
+  Rx: 0.0
+  Ry: -1.2
+  Rz: 0.0
+  # Translation vector
+  Tx: 0.0
+  Ty: 0.04
+  Tz: 0.03
 
   ########## DEBUG SETTINGS ##########
   # Topic to debug pubilsh inpainting mask to. If empty, this is disabled.
