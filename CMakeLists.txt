@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.0)
-project(lidar_cone_detection)
+project(lidar_processing)
 
 ## Compile as C++17
 set(CMAKE_CXX_STANDARD 17)
@@ -75,14 +75,14 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(lidar_cone_detection src/lidar_cone.cpp)
+add_executable(lidar_processing src/lidar_processing.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(lidar_cone_detection
+target_link_libraries(lidar_processing
     ${catkin_LIBRARIES}
     Eigen3::Eigen
     ${Boost_LIBRARY_DIR}

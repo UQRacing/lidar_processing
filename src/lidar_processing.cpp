@@ -1,7 +1,7 @@
 // LiDAR processing (new version), main file
 // Matt Young, 2022, UQRacing
-#include "lidar_cone_detection/lidar_cone.h"
-#include "lidar_cone_detection/defines.h"
+#include "lidar_processing/lidar_processing.h"
+#include "lidar_processing/defines.h"
 #include <ros/ros.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -12,9 +12,10 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
-#include "lidar_cone_detection/robin_hood.h"
+#include "lidar_processing/robin_hood.h"
+#include "lidar_processing/FastDigitalImageInpainting.h"
 // colour maps
-#include "lidar_cone_detection/turbo_colourmap.inc"
+#include "lidar_processing/turbo_colourmap.inc"
 
 using namespace uqr;
 
@@ -29,7 +30,7 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
 
     // pipeline features from YAML
     handle.getParam("/lidar_processing/inpainting", inpainting);
-    handle.getParam("/lidar_processing/dilate", dilate);
+    handle.getParam("/lidar_processing/morphological", morphological);
     handle.getParam("/lidar_processing/publishColour", publishColour);
 
     // pub/sub topics
@@ -42,8 +43,8 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
         inpaintingDebugPub = handle.advertise<sensor_msgs::CompressedImage>(inpaintingDebugTopicName, 1);
     }
 
-    ROS_INFO("Pipeline features: inpainting: %s, dilation: %s, publish colour: %s",
-             inpainting ? "yes" : "no", dilate ? "yes" : "no", publishColour ? "yes" : "no");
+    ROS_INFO("Pipeline features: inpainting: %s, morphological: %s, publish colour: %s",
+             inpainting ? "yes" : "no", morphological ? "yes" : "no", publishColour ? "yes" : "no");
 }
 
 // This part is a straightforward port of Tom's VAPE code, with some minor improvements.
@@ -182,7 +183,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     cv::projectPoints(lidarPoints, rotationMatrix, translation, intrinsic, distortion, imagePoints);
 
     // find min and max depth (for interpolation)
-    // save computing depth twice, store it in a hash map
+    // save computing depth twice, store it in a hash map (TODO check this is optimal)
     robin_hood::unordered_map<size_t, double> depthMappings{};
     double minDist = 999999, maxDist = -999999;
     // cannot parallelise this, hashmap causes segfault :(
@@ -233,15 +234,16 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
             maxY = y;
         }
     }
+    // upload to potential GPU for speed using OpenCV transparent API
+    cv::UMat depthImageGpu(height, width, CV_8UC3);
+    depthImage.copyTo(depthImageGpu);
 
-    // TODO make a UMat here and do processing on that from now onwards
-
-    // dilate the image if enabled
-    if (dilate) {
+    // apply morphological operations to the image if enabled
+    if (morphological) {
         // instead of dilation, we actually use MORPH_CLOSE because it is better
         //auto structuringElement = cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(8, 8));
         //cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, structuringElement);
-        cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, cv::Mat());
+        cv::morphologyEx(depthImageGpu, depthImageGpu, cv::MORPH_CLOSE, cv::Mat());
     }
 
     // run inpainting: like photoshop's content aware fill, slow, but yields to good results as it
@@ -250,6 +252,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     cv::Mat inpaintMask = cv::Mat::zeros(height, width, CV_8UC1);
     if (inpainting) {
         // mask of pixels not drawn in the depth image (white = not drawn, black = drawn over)
+        // remains on CPU
         cv::Mat pixelsNotDrawn = cv::Mat::zeros(height, width, CV_8UC1);
         for (int y = 0; y < depthImage.rows; y++) {
             for (int x = 0; x < depthImage.cols; x++) {
@@ -265,7 +268,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         // you can open the images in rqt and export them and use the rectangle select tool in GIMP
         // to calculate these
         // TODO define crop rect in YAML
-        cv::Rect crop(464, 381, 646, 158);
+        cv::Rect crop(337, 368, 755, 188);
         // TODO ideally we would use like pixelsNotDrawn(crop) but for god knows why it's not working
         cv::Mat cropMask = cv::Mat::zeros(height, width, CV_8UC1);
         cv::rectangle(cropMask, crop, 255,cv::LineTypes::FILLED);
@@ -276,7 +279,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         //  probably using morphological operations (very large dilation)
 
         // interpolate the depth image, currently using inpainting
-        cv::inpaint(depthImage, inpaintMask, depthImage, 4.0, cv::INPAINT_NS);
+        cv::inpaint(depthImageGpu, inpaintMask, depthImageGpu, 4.0, cv::INPAINT_TELEA);
 
 #if 0
         // blur experiment
@@ -289,8 +292,11 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
 #endif
     }
 
-    // (debug only) overlay images on top of each other
+    // copy back from GPU
+    depthImageGpu.copyTo(depthImage);
     auto publishImage = depthImage;
+
+    // (debug only) overlay images on top of each other
 //    cv::Mat publishImage(height, width, CV_8UC3);
 //    cv::addWeighted(inpainted, 0.95, *lastCameraFrame, 0.6, 0.0, publishImage);
 

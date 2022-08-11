@@ -1,0 +1,5 @@
+<!-- Launch file for lidar processing -->
+<launch>
+    <rosparam command="load" file="$(find lidar_processing)/config/lidar_processing.yaml"/>
+    <node name="lidar_depthmap" pkg="lidar_processing" type="lidar_processing" output="screen" />
+</launch>

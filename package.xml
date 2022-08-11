@@ -1,11 +1,9 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>lidar_cone_detection</name>
+  <name>lidar_processing</name>
   <version>0.0.0</version>
-  <description>Package to handle the identification of cones using LiDAR data.</description>
+  <description>UQRacing's LiDAR processing pipeline.</description>
 
-  <maintainer email="caleb@todo.todo">caleb</maintainer>
-  <maintainer email="riley.d.bowyer@gmail.com">Riley Bowyer</maintainer>
   <maintainer email="m.young2@uqconnect.edu.au">Matt Young</maintainer>
 
   <license>TODO</license>

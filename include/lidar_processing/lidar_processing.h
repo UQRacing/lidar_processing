@@ -28,7 +28,7 @@ namespace uqr {
         std::string lidarDepthTopicName{};
 
         // pipeline configuration
-        bool inpainting = false, dilate = false, publishColour = false;
+        bool inpainting = false, morphological = false, publishColour = false;
 
         ddynamic_reconfigure::DDynamicReconfigure ddr{};
 
