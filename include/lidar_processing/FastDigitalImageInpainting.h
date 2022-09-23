@@ -8,16 +8,13 @@
 #include <opencv2/opencv.hpp>
 
 namespace uqr {
-    static const float a(0.073235f);
-    static const float b(0.176765f);
-    /** fast inpaint kernel */
-    static const cv::Mat K = (cv::Mat_<float>(3, 3) << a, b, a, b, 0.0f, b, a, b, a);
-
-    void fastInpaint(const cv::Mat &src, const cv::Mat &mask, const cv::Mat kernel, cv::Mat &dst,
-                     int maxNumOfIter = 100) {
+    void fastInpaint(const cv::Mat &src, const cv::Mat &mask, cv::Mat &dst, int maxNumOfIter = 100) {
         assert(src.type() == mask.type() && mask.type() == CV_8UC3);
         assert(src.size() == mask.size());
-        assert(kernel.type() == CV_32F);
+
+        static const float a(0.073235f);
+        static const float b(0.176765f);
+        static const cv::Mat K = (cv::Mat_<float>(3, 3) << a, b, a, b, 0.0f, b, a, b, a);
 
         // fill in the missing region with the input's average color
         auto avgColor = cv::sum(src) / (src.cols * src.rows);
@@ -30,7 +27,7 @@ namespace uqr {
         int bSize = K.cols / 2;
         cv::Mat kernel3ch, inWithBorder;
         result.convertTo(result, CV_32FC3);
-        cv::cvtColor(kernel, kernel3ch, cv::COLOR_GRAY2BGR);
+        cv::cvtColor(K, kernel3ch, cv::COLOR_GRAY2BGR);
 
         cv::copyMakeBorder(result, inWithBorder, bSize, bSize, bSize, bSize, cv::BORDER_REPLICATE);
         cv::Mat resInWithBorder = cv::Mat(inWithBorder,
@@ -40,9 +37,7 @@ namespace uqr {
         for (int itr = 0; itr < maxNumOfIter; ++itr) {
             cv::copyMakeBorder(result, inWithBorder, bSize, bSize, bSize, bSize,
                                cv::BORDER_REPLICATE);
-
-            // TODO check if omp works
-//#pragma omp parallel for default(none) shared(result) firstprivate(mask, K, ch, inWithBorder, kernel3ch)
+#pragma omp parallel for default(none) shared(result) firstprivate(mask, K, ch, inWithBorder, kernel3ch)
             for (int r = 0; r < result.rows; ++r) {
                 const uchar *pMask = mask.ptr(r);
                 auto *pRes = result.ptr<float>(r);

@@ -7,6 +7,7 @@
 #include <sensor_msgs/CompressedImage.h>
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 #include <image_geometry/pinhole_camera_model.h>
+#include <image_transport/image_transport.h>
 
 #define DEG_RAD 0.017453293
 #define RAD_DEG 57.29578

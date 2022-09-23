@@ -14,7 +14,7 @@ lidar_processing:
   # Enable morphological operations. Basically increases pixel size (makes it more chunky). Fast.
   morphological: true
   # Enable inpainting. Fills in missing details in the depth image. Very slow if used on whole frame.
-  inpainting: true
+  inpainting: false
   # If true, publish a colour image (not useful for depth lookups, but good for debug/showing off).
   publishColour: true
 

@@ -13,9 +13,7 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include "lidar_processing/robin_hood.h"
-#include "lidar_processing/FastDigitalImageInpainting.h"
-// colour maps
-#include "lidar_processing/turbo_colourmap.inc"
+#include "lidar_processing/tinycolormap.hpp"
 
 using namespace uqr;
 
@@ -51,7 +49,8 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
 // Original code: https://github.com/UQRacing/VAPE/blob/master/src/main.py
 // TODO automate lidar extrinsic camera calibration
 
-// source: https://github.com/libgdx/libgdx/blob/master/gdx/src/com/badlogic/gdx/math/MathUtils.java#L385
+// Source: https://github.com/libgdx/libgdx/blob/master/gdx/src/com/badlogic/gdx/math/MathUtils.java#L385
+// Apache 2.0
 static inline constexpr double mapRange(double inRangeStart, double inRangeEnd, double outRangeStart,
                                         double outRangeEnd, double value) {
     return outRangeStart + (value - inRangeStart) * (outRangeEnd - outRangeStart) / (inRangeEnd - inRangeStart);
@@ -120,7 +119,7 @@ static std::vector<cv::Point3d> generateLidarPoints(const sensor_msgs::PointClou
  */
 static cv::Mat calculateIntrinsics(const image_geometry::PinholeCameraModel &camera) {
     cv::Mat intrinsic = cv::Mat::zeros(3, 3, CV_64F);
-    // at(row, column) = at(y,x)
+    // at(row,column) = at(y,x)
     intrinsic.at<double>(0, 0) = camera.fx();
     intrinsic.at<double>(0, 2) = camera.cx();
     // next row
@@ -156,8 +155,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     auto intrinsic = calculateIntrinsics(*camera);
 
     // distortion coefficients
-    // these are from VAPE code
-    // TODO make these configurable in YAML
+    // TODO receive these from CameraInfo
     double distortionValues[] = {-0.05496145784854889, 0.06309773772954941,
                                  -0.00040654116310179234, -0.0003133322752546519,
                                  -0.0198691263794899};
@@ -217,16 +215,25 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         // save a bit of time by looking up our previously calculated depth value
         auto dist = depthMappings[i];
 
-        // lookup intensity in Google's Turbo colour map
-        // TODO only do this if colour requested
-        auto colourIndex = floor(mapRange(minDist, maxDist, 0.0, 255.0, dist));
-        auto colour = turbo_srgb_bytes[static_cast<int>(colourIndex)];
         auto x = static_cast<int>(point.x);
         auto y = static_cast<int>(point.y);
-        // Turbo is RGB, but our Mat is BGR, hence the indexing order
-        depthImage.at<cv::Vec3b>(y, x)[0] = colour[2];
-        depthImage.at<cv::Vec3b>(y, x)[1] = colour[1];
-        depthImage.at<cv::Vec3b>(y, x)[2] = colour[0];
+
+        if (publishColour) {
+            // lookup intensity in colour map
+            auto colourIndex = mapRange(minDist, maxDist,
+                                        0.0, 1.0, dist);
+            auto colour = tinycolormap::GetColor(colourIndex, tinycolormap::ColormapType::Viridis);
+            // colour map is RGB, but our Mat is BGR, hence the indexing order
+            // TODO convert this to use cv::LUT
+            depthImage.at<cv::Vec3b>(y, x)[0] = colour.bi();
+            depthImage.at<cv::Vec3b>(y, x)[1] = colour.gi();
+            depthImage.at<cv::Vec3b>(y, x)[2] = colour.ri();
+        } else {
+            // transmit greyscale only
+            auto colour = static_cast<int>(floor(mapRange(minDist, maxDist,
+                                                          0.0, 255.0, dist)));
+            depthImage.at<uint8_t>(y, x) = colour;
+        }
 
         if (y < minY) {
             minY = y;
@@ -234,16 +241,13 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
             maxY = y;
         }
     }
-    // upload to potential GPU for speed using OpenCV transparent API
-    cv::UMat depthImageGpu(height, width, CV_8UC3);
-    depthImage.copyTo(depthImageGpu);
 
     // apply morphological operations to the image if enabled
     if (morphological) {
         // instead of dilation, we actually use MORPH_CLOSE because it is better
         //auto structuringElement = cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(8, 8));
         //cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, structuringElement);
-        cv::morphologyEx(depthImageGpu, depthImageGpu, cv::MORPH_CLOSE, cv::Mat());
+        cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, cv::Mat());
     }
 
     // run inpainting: like photoshop's content aware fill, slow, but yields to good results as it
@@ -259,6 +263,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
                 auto colour = depthImage.at<cv::Vec3b>(y, x);
                 if (colour[0] == 0 && colour[1] == 0 && colour[2] == 0) {
                     // pixel has not been written! so it should be coloured white in the output!
+                    // TODO use faster pixel access here
                     pixelsNotDrawn.at<uint8_t>(y, x) = 255;
                 }
             }
@@ -279,21 +284,15 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         //  probably using morphological operations (very large dilation)
 
         // interpolate the depth image, currently using inpainting
-        cv::inpaint(depthImageGpu, inpaintMask, depthImageGpu, 4.0, cv::INPAINT_TELEA);
+        cv::inpaint(depthImage, inpaintMask, depthImage, 4.0, cv::INPAINT_TELEA);
 
-#if 0
-        // blur experiment
-        inpaintMask = pixelsNotDrawn;
-        // copy the original image and blur it
-        cv::Mat blurImage;
-        cv::blur(depthImage, blurImage, cv::Size(32, 32));
-        // copy blurred pixels that were missing in the depth image back into the depth image
-        blurImage.copyTo(depthImage, inpaintMask);
-#endif
+        // the fast inpaint function requires a 3 channel mask for some reason and uses black to indicate
+        // areas to inpaint
+        /*cv::cvtColor(inpaintMask, inpaintMask, cv::COLOR_GRAY2BGR);
+        cv::bitwise_not(inpaintMask, inpaintMask);
+        fastInpaint(depthImage, inpaintMask,depthImage, 30);*/
     }
 
-    // copy back from GPU
-    depthImageGpu.copyTo(depthImage);
     auto publishImage = depthImage;
 
     // (debug only) overlay images on top of each other
@@ -338,8 +337,7 @@ void LidarProcessing::cameraFrameCallback(const sensor_msgs::CompressedImageCons
 
 int main(int argc, char *argv[]) {
     ros::init(argc, argv, "lidar_process");
-    ROS_INFO("LiDAR Processing v" LIDAR_PROCESSING_VERSION ": Matt Young, Fahed Alhanaee, Riley Bowyer, "
-                                                           "Caleb Aitken, 2021-2022, UQRacing");
+    ROS_INFO("LiDAR Processing Next v" LIDAR_PROCESSING_VERSION ": Matt Young, Fahed Alhanaee, 2022, UQRacing");
     auto cvCpuFeatures = cv::getCPUFeaturesLine();
     auto cvNumThreads = cv::getNumThreads();
     auto cvVersion = cv::getVersionString();
