@@ -76,9 +76,14 @@ some method.
 
 ## Building and running
 Somewhat amazingly this project requires no dependencies outside of those shipped with ROS Noetic
-by default.
+by default. You can just build it with `catkin build`.
 
 To run the pipeline use `roslaunch lidar_processing lidar_processing.launch`
 
 ## Licence
-TODO
+This project is licenced under the Mozilla Public Licence v2.0.
+
+We also use the following third-party libraries:
+
+- [https://github.com/martinus/robin-hood-hashing](Robin Hood Hashing): MIT licence
+- [https://github.com/yuki-koyama/tinycolormap](tinycolormap): MIT licence
