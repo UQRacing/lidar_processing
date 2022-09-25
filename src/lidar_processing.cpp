@@ -15,46 +15,12 @@
 #include "lidar_processing/robin_hood.h"
 #include "lidar_processing/tinycolormap.hpp"
 
-using namespace uqr;
-
-LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
-    if (!handle.getParam("/lidar_processing/lidar_topic", lidarTopicName)) {
-        ROS_ERROR("Failed to load lidar_topic from lidar cone config YAML");
-    }
-    handle.getParam("/lidar_processing/lidar_debug_pub", lidarDebugTopicName);
-    handle.getParam("/lidar_processing/camera_info_topic", cameraInfoTopicName);
-    handle.getParam("/lidar_processing/lidar_depth_pub", lidarDepthTopicName);
-    auto inpaintingDebugTopicName = handle.param<std::string>("/lidar_processing/inpainting_debug_pub", "");
-
-    // pipeline features from YAML
-    handle.getParam("/lidar_processing/inpainting", inpainting);
-    handle.getParam("/lidar_processing/morphological", morphological);
-    handle.getParam("/lidar_processing/publishColour", publishColour);
-
-    // pub/sub topics
-    lidarSub = handle.subscribe(lidarTopicName, 1, &LidarProcessing::lidarCallback, this);
-    cameraInfoSub = handle.subscribe(cameraInfoTopicName, 1, &LidarProcessing::cameraInfoCallback, this);
-    lidarDepthPub = handle.advertise<sensor_msgs::CompressedImage>(lidarDepthTopicName, 1);
-    cameraFrameSub = handle.subscribe("/camera/color/image_raw/compressed", 1, &LidarProcessing::cameraFrameCallback, this);
-    if (!inpaintingDebugTopicName.empty()) {
-        ROS_INFO("Publishing inpainting debug to topic %s", inpaintingDebugTopicName.c_str());
-        inpaintingDebugPub = handle.advertise<sensor_msgs::CompressedImage>(inpaintingDebugTopicName, 1);
-    }
-
-    ROS_INFO("Pipeline features: inpainting: %s, morphological: %s, publish colour: %s",
-             inpainting ? "yes" : "no", morphological ? "yes" : "no", publishColour ? "yes" : "no");
-}
-
 // This part is a straightforward port of Tom's VAPE code, with some minor improvements.
 // Original code: https://github.com/UQRacing/VAPE/blob/master/src/main.py
-// TODO automate lidar extrinsic camera calibration
+// The legacy VAPE code has been renamed into vape-legacy, and the new VAPE, "vape2", will just be
+// focused on vehicle position estimation and cone position estimation
 
-// Source: https://github.com/libgdx/libgdx/blob/master/gdx/src/com/badlogic/gdx/math/MathUtils.java#L385
-// Apache 2.0
-static inline constexpr double mapRange(double inRangeStart, double inRangeEnd, double outRangeStart,
-                                        double outRangeEnd, double value) {
-    return outRangeStart + (value - inRangeStart) * (outRangeEnd - outRangeStart) / (inRangeEnd - inRangeStart);
-}
+using namespace uqr;
 
 /**
  * Uses Rodrigues' formula to turn a 3D rotation vector into a 3D rotation matrix.
@@ -68,7 +34,6 @@ static cv::Mat constructRotationMatrix(double xtheta, double ytheta, double zthe
     // - https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
     // - https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula (I believe this is what we are doing)
     // - cv::Rodrigues
-
     double xthetaRad = xtheta * DEG_RAD;
     double ythetaRad = ytheta * DEG_RAD;
     double zthetaRad = ztheta * DEG_RAD;
@@ -82,6 +47,13 @@ static cv::Mat constructRotationMatrix(double xtheta, double ytheta, double zthe
     cv::Rodrigues(rotationVector, rotationMatrix);
 
     return rotationMatrix;
+}
+
+// Source: https://github.com/libgdx/libgdx/blob/master/gdx/src/com/badlogic/gdx/math/MathUtils.java#L385
+// Apache 2.0
+static inline constexpr double mapRange(double inRangeStart, double inRangeEnd, double outRangeStart,
+                                        double outRangeEnd, double value) {
+    return outRangeStart + (value - inRangeStart) * (outRangeEnd - outRangeStart) / (inRangeEnd - inRangeStart);
 }
 
 /**
@@ -113,27 +85,40 @@ static std::vector<cv::Point3d> generateLidarPoints(const sensor_msgs::PointClou
     return lidarPoints;
 }
 
-/**
- * Calculates camera intrinsic matrix from received camera model
- * @return
- */
-static cv::Mat calculateIntrinsics(const image_geometry::PinholeCameraModel &camera) {
-    cv::Mat intrinsic = cv::Mat::zeros(3, 3, CV_64F);
-    // at(row,column) = at(y,x)
-    intrinsic.at<double>(0, 0) = camera.fx();
-    intrinsic.at<double>(0, 2) = camera.cx();
-    // next row
-    intrinsic.at<double>(1, 1) = camera.fy();
-    intrinsic.at<double>(1, 2) = camera.cy();
-    // next row
-    intrinsic.at<double>(2, 2) = 1.0;
-    /*
-     intrinsic matrix:
-     { camera->fx(), 0.0, camera->cx() },
-     { 0.0, camera->fy(), camera->cy() },
-     { 0.0, 0.0,          1.0 }
-     */
-    return intrinsic;
+LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
+    if (!handle.getParam("/lidar_processing/lidar_topic", lidarTopicName)) {
+        ROS_ERROR("Failed to load lidar_topic from lidar cone config YAML");
+    }
+    handle.getParam("/lidar_processing/lidar_debug_pub", lidarDebugTopicName);
+    handle.getParam("/lidar_processing/camera_info_topic", cameraInfoTopicName);
+    handle.getParam("/lidar_processing/lidar_depth_pub", lidarDepthTopicName);
+    handle.getParam("/lidar_processing/rvec", rvecYaml);
+    handle.getParam("/lidar_processing/tvec", tvecYaml);
+    auto inpaintingDebugTopicName = handle.param<std::string>("/lidar_processing/inpainting_debug_pub", "");
+
+    // pipeline features from YAML
+    handle.getParam("/lidar_processing/inpainting", inpainting);
+    handle.getParam("/lidar_processing/morphological", morphological);
+    handle.getParam("/lidar_processing/publishColour", publishColour);
+
+    // camera rotation parameters (extrinsic)
+    double Rx = rvecYaml[0];
+    double Ry = rvecYaml[1];
+    double Rz = rvecYaml[2];
+    rotationMatrix = constructRotationMatrix(Rx, Ry, Rz);
+
+    // pub/sub topics
+    lidarSub = handle.subscribe(lidarTopicName, 1, &LidarProcessing::lidarCallback, this);
+    cameraInfoSub = handle.subscribe(cameraInfoTopicName, 1, &LidarProcessing::cameraInfoCallback, this);
+    lidarDepthPub = handle.advertise<sensor_msgs::CompressedImage>(lidarDepthTopicName, 1);
+    cameraFrameSub = handle.subscribe("/camera/color/image_raw/compressed", 1, &LidarProcessing::cameraFrameCallback, this);
+    if (!inpaintingDebugTopicName.empty()) {
+        ROS_INFO("Publishing inpainting debug to topic %s", inpaintingDebugTopicName.c_str());
+        inpaintingDebugPub = handle.advertise<sensor_msgs::CompressedImage>(inpaintingDebugTopicName, 1);
+    }
+
+    ROS_INFO("Pipeline features: inpainting: %s, morphological: %s, publish colour: %s",
+             inpainting ? "yes" : "no", morphological ? "yes" : "no", publishColour ? "yes" : "no");
 }
 
 void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
@@ -146,35 +131,17 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     int width = static_cast<int>(cameraInfo->width);
     int height = static_cast<int>(cameraInfo->height);
 
-    // TODO only calculate these camera matrices once
-
     // generate lidar points
     auto lidarPoints = generateLidarPoints(rosCloud);
 
-    // calculate intrinsics
-    auto intrinsic = calculateIntrinsics(*camera);
-
-    // distortion coefficients
-    // TODO receive these from CameraInfo
-    double distortionValues[] = {-0.05496145784854889, 0.06309773772954941,
-                                 -0.00040654116310179234, -0.0003133322752546519,
-                                 -0.0198691263794899};
-    auto distortion = cv::Mat(1, 5, CV_64F, distortionValues);
-
-    // setup the extrinsic parameters
-    // TODO make these configurable in YAML
-    // camera rotation parameters
-    double Rx = 0.0;
-    double Ry = -1.2;
-    double Rz = 0.0;
-    auto rotationMatrix = constructRotationMatrix(Rx, Ry, Rz);
-
-    // camera translation parameters
-    double Tx = 0.0;
-    double Ty = 0.04;
-    double Tz = 0.03;
+    // camera translation parameters (extrinsic)
+    // for some absolutely godforsaken stupid awful reason, we have to recalculate this every callback,
+    // otherwise the results are incorrect and glitchy
+    double Tx = tvecYaml[0];
+    double Ty = tvecYaml[1];
+    double Tz = tvecYaml[2];
     double translationValues[] = {Tx, Ty, Tz};
-    auto translation = cv::Mat(1, 3, CV_64F, translationValues);
+    translation = cv::Mat(1, 3, CV_64F, translationValues);
 
     // get projected points
     std::vector<cv::Point2d> imagePoints{};
@@ -184,7 +151,6 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     // save computing depth twice, store it in a hash map (TODO check this is optimal)
     robin_hood::unordered_map<size_t, double> depthMappings{};
     double minDist = 999999, maxDist = -999999;
-    // cannot parallelise this, hashmap causes segfault :(
     for (size_t i = 0; i < imagePoints.size(); i++) {
         auto dist = norm(lidarPoints[i]);
         auto point = imagePoints[i];
@@ -199,9 +165,6 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
             maxDist = dist;
         }
     }
-
-    // record min and max y written to the image, so we know in what range to interpolate (for inpainting)
-    int minY = 9999, maxY = -9999;
 
     // big step: construct the depth image
     cv::Mat depthImage(height, width, CV_8UC3);
@@ -222,37 +185,33 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
             // lookup intensity in colour map
             auto colourIndex = mapRange(minDist, maxDist,
                                         0.0, 1.0, dist);
-            auto colour = tinycolormap::GetColor(colourIndex, tinycolormap::ColormapType::Viridis);
+            auto colour = tinycolormap::GetColor(colourIndex, tinycolormap::ColormapType::Turbo);
+
             // colour map is RGB, but our Mat is BGR, hence the indexing order
-            // TODO convert this to use cv::LUT
-            depthImage.at<cv::Vec3b>(y, x)[0] = colour.bi();
-            depthImage.at<cv::Vec3b>(y, x)[1] = colour.gi();
-            depthImage.at<cv::Vec3b>(y, x)[2] = colour.ri();
+            // access pixels directly for speed https://stackoverflow.com/a/8933111/5007892
+            depthImage.data[depthImage.channels() * (depthImage.cols * y + x) + 0] = colour.bi();
+            depthImage.data[depthImage.channels() * (depthImage.cols * y + x) + 1] = colour.gi();
+            depthImage.data[depthImage.channels() * (depthImage.cols * y + x) + 2] = colour.ri();
         } else {
             // transmit greyscale only
             auto colour = static_cast<int>(floor(mapRange(minDist, maxDist,
                                                           0.0, 255.0, dist)));
-            depthImage.at<uint8_t>(y, x) = colour;
-        }
-
-        if (y < minY) {
-            minY = y;
-        } else if (y > maxY) {
-            maxY = y;
+            // although the image is greyscale, it still uses 3 channels for compatibility with
+            // the colour image
+            depthImage.data[depthImage.channels() * (depthImage.cols * y + x) + 0] = colour;
+            depthImage.data[depthImage.channels() * (depthImage.cols * y + x) + 1] = colour;
+            depthImage.data[depthImage.channels() * (depthImage.cols * y + x) + 2] = colour;
         }
     }
 
     // apply morphological operations to the image if enabled
     if (morphological) {
         // instead of dilation, we actually use MORPH_CLOSE because it is better
-        //auto structuringElement = cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(8, 8));
-        //cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, structuringElement);
         cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, cv::Mat());
     }
 
     // run inpainting: like photoshop's content aware fill, slow, but yields to good results as it
     // fills in missing depth pixels leading to a much denser image
-    // TODO instead of doing inpaint, maybe try force opencv to do bicubic interpolation (faster)
     cv::Mat inpaintMask = cv::Mat::zeros(height, width, CV_8UC1);
     if (inpainting) {
         // mask of pixels not drawn in the depth image (white = not drawn, black = drawn over)
@@ -261,9 +220,9 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         for (int y = 0; y < depthImage.rows; y++) {
             for (int x = 0; x < depthImage.cols; x++) {
                 auto colour = depthImage.at<cv::Vec3b>(y, x);
+                // if the pixel is black, it has not been written: so it should be white in the
+                // inpaint masking
                 if (colour[0] == 0 && colour[1] == 0 && colour[2] == 0) {
-                    // pixel has not been written! so it should be coloured white in the output!
-                    // TODO use faster pixel access here
                     pixelsNotDrawn.at<uint8_t>(y, x) = 255;
                 }
             }
@@ -274,23 +233,14 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         // to calculate these
         // TODO define crop rect in YAML
         cv::Rect crop(337, 368, 755, 188);
-        // TODO ideally we would use like pixelsNotDrawn(crop) but for god knows why it's not working
+        // ideally we would use like pixelsNotDrawn(crop) but for god knows why it's not working
         cv::Mat cropMask = cv::Mat::zeros(height, width, CV_8UC1);
         cv::rectangle(cropMask, crop, 255,cv::LineTypes::FILLED);
         // bitwise_and is faster than copyTo it seems
         cv::bitwise_and(pixelsNotDrawn, cropMask, inpaintMask);
 
-        // TODO ideally everything outside of this crop rectangle gets "filled in" more inaccurately
-        //  probably using morphological operations (very large dilation)
-
         // interpolate the depth image, currently using inpainting
-        cv::inpaint(depthImage, inpaintMask, depthImage, 4.0, cv::INPAINT_TELEA);
-
-        // the fast inpaint function requires a 3 channel mask for some reason and uses black to indicate
-        // areas to inpaint
-        /*cv::cvtColor(inpaintMask, inpaintMask, cv::COLOR_GRAY2BGR);
-        cv::bitwise_not(inpaintMask, inpaintMask);
-        fastInpaint(depthImage, inpaintMask,depthImage, 30);*/
+        cv::inpaint(depthImage, inpaintMask, depthImage, 1.0, cv::INPAINT_TELEA);
     }
 
     auto publishImage = depthImage;
@@ -327,6 +277,10 @@ void LidarProcessing::cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &
     camera->fromCameraInfo(msg);
     cameraInfo = *msg;
     ROS_INFO("Received camera model");
+
+    // get intrinsics and distortion coefficients from camera model
+    intrinsic = camera->fullIntrinsicMatrix();
+    distortion = camera->distortionCoeffs();
 }
 
 void LidarProcessing::cameraFrameCallback(const sensor_msgs::CompressedImageConstPtr &image) {

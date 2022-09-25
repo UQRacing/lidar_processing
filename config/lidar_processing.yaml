@@ -32,7 +32,7 @@ lidar_processing:
   # Rotation vector (x,y,z)
   rvec:
     - 0.0
-    - 1.2
+    - -1.2
     - 0.0
   # Translation vector (x,y,z)
   tvec:

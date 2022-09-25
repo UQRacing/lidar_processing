@@ -27,6 +27,11 @@ namespace uqr {
         std::string lidarDebugTopicName{};
         std::string cameraInfoTopicName{};
         std::string lidarDepthTopicName{};
+        std::vector<double> rvecYaml{}, tvecYaml{};
+
+        // Camera matrices
+        cv::Mat rotationMatrix, translation, distortion;
+        cv::Matx33d intrinsic;
 
         // pipeline configuration
         bool inpainting = false, morphological = false, publishColour = false;
