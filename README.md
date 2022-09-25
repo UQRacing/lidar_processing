@@ -85,5 +85,5 @@ This project is licenced under the Mozilla Public Licence v2.0.
 
 We also use the following third-party libraries:
 
-- [https://github.com/martinus/robin-hood-hashing](Robin Hood Hashing): MIT licence
-- [https://github.com/yuki-koyama/tinycolormap](tinycolormap): MIT licence
+- [Robin Hood Hashing](https://github.com/martinus/robin-hood-hashing): MIT licence
+- [tinycolormap](https://github.com/yuki-koyama/tinycolormap]): MIT licence
