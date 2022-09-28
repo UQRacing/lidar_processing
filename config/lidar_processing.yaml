@@ -8,7 +8,7 @@ lidar_processing:
   # Topic to publish the depth images to. Compressed images only. Must end in /compressed.
   lidar_depth_pub: "/lidar_processing/depth/compressed"
   # Topic we receive CameraInfo messages from
-  camera_info_topic: "/camera/color/camera_info"
+  camera_info_topic: "/camera/camera_info"
 
   ########## PIPELINE SETTINGS ##########
   # Enable morphological operations. Basically increases pixel size (makes it more chunky). Fast.
@@ -44,4 +44,4 @@ lidar_processing:
   # Topic to debug pubilsh inpainting mask to. If empty, this is disabled.
   inpainting_debug_pub: "/lidar_processing/inpaintingDebug/compressed"
   # Topic we receive compressed camera frames from. Only for debug.
-  camera_frame_topic: "/camera/color/image_raw/compressed"
+  camera_frame_topic: "/camera/image_rect_color/compressed"

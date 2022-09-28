@@ -15,7 +15,8 @@ namespace uqr {
  * Version history:
  * v0.0.1: initial release
  * v1.0.0: first proper release
+ * v1.0.1: fixed the pipeline saying camera info unavailable when it was available
  */
-#define LIDAR_PROCESSING_VERSION "1.0.0"
+#define LIDAR_PROCESSING_VERSION "1.0.1"
 
 }

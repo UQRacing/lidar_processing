@@ -103,6 +103,8 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     handle.getParam("/lidar_processing/tvec", tvecYaml);
     auto inpaintingDebugTopicName = handle.param<std::string>("/lidar_processing/inpainting_debug_pub", "");
 
+    ROS_INFO("Camera info topic name: %s", cameraInfoTopicName.c_str());
+
     // pipeline features from YAML
     handle.getParam("/lidar_processing/inpainting", inpainting);
     handle.getParam("/lidar_processing/morphological", morphological);
@@ -131,7 +133,7 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
 void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
     auto start = ros::WallTime::now();
 
-    if (!camera.has_value() || !cameraInfo.has_value() || !lastCameraFrame.has_value()) {
+    if (!camera.has_value() || !cameraInfo.has_value()) {
         ROS_WARN("Cannot generate depth buffer, still waiting for camera info!");
         return;
     }
@@ -214,6 +216,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     // apply morphological operations to the image if enabled
     if (morphological) {
         // instead of dilation, we actually use MORPH_CLOSE because it is better
+        // TODO allow defining kernel size in YAML
         cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, cv::Mat());
     }
 
@@ -238,7 +241,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         // constrain region to inpaint into a manually calculated bounding box
         // you can open the images in rqt and export them and use the rectangle select tool in GIMP
         // to calculate these
-        // TODO define crop rect in YAML
+        // TODO define crop rect in YAML (or just remove crop rect and only fill inside cone bounding box)
         cv::Rect crop(337, 368, 755, 188);
         // ideally we would use like pixelsNotDrawn(crop) but for god knows why it's not working
         cv::Mat cropMask = cv::Mat::zeros(height, width, CV_8UC1);
@@ -272,7 +275,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     }
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
-    ROS_INFO("Lidar callback time: %.2f ms", time);
+    ROS_INFO("Lidar callback time: %.2f ms (%.2f FPS)", time, (1000.0 / time));
 }
 
 void LidarProcessing::cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &msg) {
