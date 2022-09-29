@@ -10,6 +10,12 @@ lidar_processing:
   # Topic we receive CameraInfo messages from
   camera_info_topic: "/camera/camera_info"
 
+  ########## DEBUG TOPICS ##########
+  # Topic to debug publish inpainting mask to. If empty, this is disabled.
+  inpainting_debug_pub: "/lidar_processing/inpaintingDebug/compressed"
+  # Topic we receive compressed camera frames from. Only for debug.
+  camera_frame_topic: "/camera/image_rect_color/compressed"
+
   ########## PIPELINE SETTINGS ##########
   # Enable morphological operations. Basically increases pixel size (makes it more chunky). Fast.
   morphological: true
@@ -17,15 +23,13 @@ lidar_processing:
   inpainting: false
   # If true, publish a colour image (not useful for depth lookups, but good for debug/showing off).
   publishColour: true
+  # If true, only inpaint inside detected cone bounding boxes from conenet_ros. Otherwise, the whole
+  # image is inpainted.
+  # TODO implement this
+  inpaintDetectionsOnly: true
 
-  # Only inpaint within this ROI rectangle in the depth image to improve performance.
-  # Can be determined by saving an image, importing it into GIMP and using rectangle select tool.
-  # Format: x,y,width,height
-  inpaintRoi:
-    - 464
-    - 381
-    - 646
-    - 158
+  # Morphological operator kernel size (TODO implement this)
+  morphKernelSize: 16
 
   ########## CAMERA PARAMETERS ##########
   # Extrinsic parameters
@@ -39,9 +43,3 @@ lidar_processing:
     - 0.0
     - 0.04
     - 0.03
-
-  ########## DEBUG SETTINGS ##########
-  # Topic to debug pubilsh inpainting mask to. If empty, this is disabled.
-  inpainting_debug_pub: "/lidar_processing/inpaintingDebug/compressed"
-  # Topic we receive compressed camera frames from. Only for debug.
-  camera_frame_topic: "/camera/image_rect_color/compressed"

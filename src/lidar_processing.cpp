@@ -101,6 +101,7 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     handle.getParam("/lidar_processing/lidar_depth_pub", lidarDepthTopicName);
     handle.getParam("/lidar_processing/rvec", rvecYaml);
     handle.getParam("/lidar_processing/tvec", tvecYaml);
+    handle.getParam("/lidar_processing/morphKernelSize", morphKernelSize);
     auto inpaintingDebugTopicName = handle.param<std::string>("/lidar_processing/inpainting_debug_pub", "");
 
     ROS_INFO("Camera info topic name: %s", cameraInfoTopicName.c_str());
@@ -216,8 +217,9 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     // apply morphological operations to the image if enabled
     if (morphological) {
         // instead of dilation, we actually use MORPH_CLOSE because it is better
-        // TODO allow defining kernel size in YAML
-        cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, cv::Mat());
+        auto kernel = cv::getStructuringElement(cv::MorphShapes::MORPH_RECT,
+                                                cv::Size(morphKernelSize, morphKernelSize));
+        cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, kernel);
     }
 
     // run inpainting: like photoshop's content aware fill, slow, but yields to good results as it
@@ -241,7 +243,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         // constrain region to inpaint into a manually calculated bounding box
         // you can open the images in rqt and export them and use the rectangle select tool in GIMP
         // to calculate these
-        // TODO define crop rect in YAML (or just remove crop rect and only fill inside cone bounding box)
+        // TODO crop rects should be conenet_ros predictions
         cv::Rect crop(337, 368, 755, 188);
         // ideally we would use like pixelsNotDrawn(crop) but for god knows why it's not working
         cv::Mat cropMask = cv::Mat::zeros(height, width, CV_8UC1);

@@ -35,6 +35,7 @@ namespace uqr {
         std::string cameraInfoTopicName{};
         std::string lidarDepthTopicName{};
         std::vector<double> rvecYaml{}, tvecYaml{};
+        int morphKernelSize{};
 
         // Camera matrices
         cv::Mat rotationMatrix, translation, distortion;
