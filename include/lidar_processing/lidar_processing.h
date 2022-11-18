@@ -26,14 +26,13 @@ namespace uqr {
 
     private:
         ros::Subscriber lidarSub, cameraInfoSub, cameraFrameSub;
-        ros::Publisher lidarDepthPub;
+        ros::Publisher lidarDepthImgPub;
         std::optional<ros::Publisher> inpaintingDebugPub;
 
         // YAML parameters
         std::string lidarTopicName{};
-        std::string lidarDebugTopicName{};
         std::string cameraInfoTopicName{};
-        std::string lidarDepthTopicName{};
+        std::string lidarDepthImgTopicName{};
         std::vector<double> rvecYaml{}, tvecYaml{};
         int morphKernelSize{};
 
