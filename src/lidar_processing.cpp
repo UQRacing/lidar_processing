@@ -21,12 +21,12 @@
 #include <cv_bridge/cv_bridge.h>
 #include "lidar_processing/tinycolormap.hpp"
 
-// This part is a straightforward port of Tom's VAPE code, with some minor improvements.
+using namespace uqr;
+
+// This part (up until the constructor) is a straightforward port of Tom's VAPE code, with some minor improvements.
 // Original code: https://github.com/UQRacing/VAPE/blob/master/src/main.py
 // The legacy VAPE code has been renamed into vape-legacy, and the new VAPE, "vape2", will just be
 // focused on vehicle position estimation and cone position estimation
-
-using namespace uqr;
 
 /**
  * Uses Rodrigues' formula to turn a 3D rotation vector into a 3D rotation matrix.
@@ -92,11 +92,10 @@ static std::vector<cv::Point3d> generateLidarPoints(const sensor_msgs::PointClou
 }
 
 LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
-    if (!handle.getParam("/lidar_processing/lidar_topic", lidarTopicName)) {
-        ROS_ERROR("Failed to load lidar_topic from lidar cone config YAML");
-    }
+    handle.getParam("/lidar_processing/lidar_topic", lidarTopicName);
     handle.getParam("/lidar_processing/camera_info_topic", cameraInfoTopicName);
     handle.getParam("/lidar_processing/lidar_depth_image_pub", lidarDepthImgTopicName);
+    handle.getParam("/lidar_processing/lidar_depth_pub", lidarDepthTopicName);
     handle.getParam("/lidar_processing/rvec", rvecYaml);
     handle.getParam("/lidar_processing/tvec", tvecYaml);
     handle.getParam("/lidar_processing/morphKernelSize", morphKernelSize);
@@ -117,19 +116,22 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     // pub/sub topics
     lidarSub = handle.subscribe(lidarTopicName, 1, &LidarProcessing::lidarCallback, this);
     cameraInfoSub = handle.subscribe(cameraInfoTopicName, 1, &LidarProcessing::cameraInfoCallback, this);
+    // this one publishes just the image
     lidarDepthImgPub = handle.advertise<sensor_msgs::CompressedImage>(lidarDepthImgTopicName, 1);
+    // this one publishes the data which will actually be used in other nodes
+    lidarDepthPub = handle.advertise<uqr_msgs::DepthImage>(lidarDepthTopicName, 1);
     ROS_INFO("Subscribing to LiDAR topic on %s", lidarTopicName.c_str());
     ROS_INFO("Subscribing to camera info topic on %s", cameraInfoTopicName.c_str());
+    ROS_INFO("Publishing LiDAR depth data to topic %s", lidarDepthTopicName.c_str());
 
     // debug topics
     if (!inpaintingDebugTopicName.empty()) {
-        ROS_INFO("Publishing inpainting debug to topic %s", inpaintingDebugTopicName.c_str());
+        ROS_INFO("(Optional, enabled) Publishing inpainting debug to topic %s", inpaintingDebugTopicName.c_str());
         inpaintingDebugPub = handle.advertise<sensor_msgs::CompressedImage>(inpaintingDebugTopicName, 1);
     }
     if (!cameraFrameTopicName.empty()) {
-        ROS_INFO("Receiving camera frames for debug on topic %s", cameraFrameTopicName.c_str());
-        cameraFrameSub = handle.subscribe("/camera/color/image_raw/compressed", 1,
-                                          &LidarProcessing::cameraFrameCallback, this);
+        ROS_INFO("(Optional, enabled) Receiving camera frames for debug on topic %s", cameraFrameTopicName.c_str());
+        cameraFrameSub = handle.subscribe(cameraFrameTopicName, 1,&LidarProcessing::cameraFrameCallback, this);
     }
 
     ROS_INFO("Pipeline features: inpainting: %s, morphological: %s, publish colour: %s",
@@ -269,7 +271,16 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     cvImage.header.stamp = ros::Time::now();
     cvImage.image = publishImage;
     cvImage.encoding = sensor_msgs::image_encodings::BGR8;
-    lidarDepthImgPub.publish(cvImage.toCompressedImageMsg(cv_bridge::Format::PNG));
+    auto compressed = cvImage.toCompressedImageMsg(cv_bridge::Format::PNG);
+    lidarDepthImgPub.publish(compressed);
+
+    // publish the actual LiDAR-camera fusion data that other nodes will use
+    auto depthImageMsg = uqr_msgs::DepthImage();
+    depthImageMsg.header.stamp = ros::Time::now();
+    depthImageMsg.depthImage = *compressed;
+    depthImageMsg.min = minDist;
+    depthImageMsg.max = maxDist;
+    lidarDepthPub.publish(depthImageMsg);
 
     // publish inpainting debug if requested, and inpainting is enabled
     if (inpaintingDebugPub.has_value() && inpainting) {
@@ -281,7 +292,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     }
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
-    ROS_INFO("Lidar callback time: %.2f ms (%.2f FPS)", time, (1000.0 / time));
+    ROS_INFO("Lidar callback time: %.2f ms (at least %.2f FPS)", time, (1000.0 / time));
 }
 
 void LidarProcessing::cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &msg) {
@@ -301,7 +312,7 @@ void LidarProcessing::cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &
 
 void LidarProcessing::cameraFrameCallback(const sensor_msgs::CompressedImageConstPtr &image) {
     lastCameraFrame = cv_bridge::toCvCopy(*image, "bgr8")->image;
-    ROS_INFO("Received camera frame");
+//    ROS_INFO("Received camera frame");
 }
 
 

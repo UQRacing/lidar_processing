@@ -7,6 +7,8 @@ lidar_processing:
   lidar_topic: "/lslidar_point_cloud"
   # Topic we receive CameraInfo messages from
   camera_info_topic: "/camera/camera_info"
+  # Topic to publish uqr_msgs/DepthImage to
+  lidar_depth_pub: "/lidar_processing/depth"
 
   ########## DEBUG TOPICS ##########
   # Topic to debug publish inpainting mask to. If empty, this is disabled.

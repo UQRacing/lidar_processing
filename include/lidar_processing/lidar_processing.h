@@ -15,6 +15,7 @@
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <image_transport/image_transport.h>
+#include <uqr_msgs/DepthImage.h>
 
 #define DEG_RAD 0.017453293
 #define RAD_DEG 57.29578
@@ -26,13 +27,14 @@ namespace uqr {
 
     private:
         ros::Subscriber lidarSub, cameraInfoSub, cameraFrameSub;
-        ros::Publisher lidarDepthImgPub;
+        ros::Publisher lidarDepthImgPub, lidarDepthPub;
         std::optional<ros::Publisher> inpaintingDebugPub;
 
         // YAML parameters
         std::string lidarTopicName{};
         std::string cameraInfoTopicName{};
         std::string lidarDepthImgTopicName{};
+        std::string lidarDepthTopicName{};
         std::vector<double> rvecYaml{}, tvecYaml{};
         int morphKernelSize{};
 

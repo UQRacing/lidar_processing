@@ -18,7 +18,8 @@ namespace uqr {
  * v1.0.1: fixed the pipeline saying camera info unavailable when it was available
  * v1.0.2: fixed image topics not setting the header timestamp
  * v1.0.3: refactored topic names
+ * v1.1.0: added uqr_msgs/DepthImage publisher
  */
-#define LIDAR_PROCESSING_VERSION "1.0.3"
+#define LIDAR_PROCESSING_VERSION "1.1.0"
 
 }
