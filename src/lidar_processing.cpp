@@ -103,7 +103,6 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     auto inpaintingDebugTopicName = handle.param<std::string>("/lidar_processing/inpainting_debug_pub", "");
 
     // pipeline features from YAML
-    handle.getParam("/lidar_processing/inpainting", inpainting);
     handle.getParam("/lidar_processing/morphological", morphological);
     handle.getParam("/lidar_processing/publishColour", publishColour);
 
@@ -125,22 +124,17 @@ LidarProcessing::LidarProcessing(ros::NodeHandle &handle) {
     ROS_INFO("Publishing LiDAR depth data to topic %s", lidarDepthTopicName.c_str());
 
     // debug topics
-    if (!inpaintingDebugTopicName.empty()) {
-        ROS_INFO("(Optional, enabled) Publishing inpainting debug to topic %s", inpaintingDebugTopicName.c_str());
-        inpaintingDebugPub = handle.advertise<sensor_msgs::CompressedImage>(inpaintingDebugTopicName, 1);
-    }
     if (!cameraFrameTopicName.empty()) {
         ROS_INFO("(Optional, enabled) Receiving camera frames for debug on topic %s", cameraFrameTopicName.c_str());
         cameraFrameSub = handle.subscribe(cameraFrameTopicName, 1,&LidarProcessing::cameraFrameCallback, this);
     }
 
-    ROS_INFO("Pipeline features: inpainting: %s, morphological: %s, publish colour: %s",
-             inpainting ? "yes" : "no", morphological ? "yes" : "no", publishColour ? "yes" : "no");
+    ROS_INFO("Pipeline features: morphological: %s, publish colour: %s",
+             morphological ? "yes" : "no", publishColour ? "yes" : "no");
 }
 
 void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosCloud) {
     auto start = ros::WallTime::now();
-
     if (!camera.has_value() || !cameraInfo.has_value()) {
         ROS_WARN("Cannot generate depth buffer, still waiting for camera info!");
         return;
@@ -152,7 +146,7 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     auto lidarPoints = generateLidarPoints(rosCloud);
 
     // camera translation parameters (extrinsic)
-    // for some absolutely godforsaken stupid awful reason, we have to recalculate this every callback,
+    // for some absolutely stupid awful reason, we have to recalculate this every callback,
     // otherwise the results are incorrect and glitchy
     double Tx = tvecYaml[0];
     double Ty = tvecYaml[1];
@@ -225,40 +219,6 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
         cv::morphologyEx(depthImage, depthImage, cv::MORPH_CLOSE, kernel);
     }
 
-    // run inpainting: like photoshop's content aware fill, slow, but yields to good results as it
-    // fills in missing depth pixels leading to a much denser image
-    // TODO: remove inpainting, it is no longer useful
-    cv::Mat inpaintMask = cv::Mat::zeros(height, width, CV_8UC1);
-    if (inpainting) {
-        // mask of pixels not drawn in the depth image (white = not drawn, black = drawn over)
-        // remains on CPU
-        cv::Mat pixelsNotDrawn = cv::Mat::zeros(height, width, CV_8UC1);
-        for (int y = 0; y < depthImage.rows; y++) {
-            for (int x = 0; x < depthImage.cols; x++) {
-                auto colour = depthImage.at<cv::Vec3b>(y, x);
-                // if the pixel is black, it has not been written: so it should be white in the
-                // inpaint masking
-                if (colour[0] == 0 && colour[1] == 0 && colour[2] == 0) {
-                    pixelsNotDrawn.at<uint8_t>(y, x) = 255;
-                }
-            }
-        }
-
-        // constrain region to inpaint into a manually calculated bounding box
-        // you can open the images in rqt and export them and use the rectangle select tool in GIMP
-        // to calculate these
-        // TODO crop rects should be conenet_ros predictions
-        cv::Rect crop(337, 368, 755, 188);
-        // ideally we would use like pixelsNotDrawn(crop) but for god knows why it's not working
-        cv::Mat cropMask = cv::Mat::zeros(height, width, CV_8UC1);
-        cv::rectangle(cropMask, crop, 255,cv::LineTypes::FILLED);
-        // bitwise_and is faster than copyTo it seems
-        cv::bitwise_and(pixelsNotDrawn, cropMask, inpaintMask);
-
-        // interpolate the depth image, currently using inpainting
-        cv::inpaint(depthImage, inpaintMask, depthImage, 1.0, cv::INPAINT_TELEA);
-    }
-
     auto publishImage = depthImage;
 
     // (debug only) overlay images on top of each other
@@ -281,15 +241,6 @@ void LidarProcessing::lidarCallback(const sensor_msgs::PointCloud2ConstPtr &rosC
     depthImageMsg.min = minDist;
     depthImageMsg.max = maxDist;
     lidarDepthPub.publish(depthImageMsg);
-
-    // publish inpainting debug if requested, and inpainting is enabled
-    if (inpaintingDebugPub.has_value() && inpainting) {
-        auto debugImage = cv_bridge::CvImage();
-        debugImage.header.stamp = ros::Time::now();
-        debugImage.image = inpaintMask;
-        debugImage.encoding = sensor_msgs::image_encodings::MONO8;
-        inpaintingDebugPub->publish(debugImage.toCompressedImageMsg(cv_bridge::Format::PNG));
-    }
 
     double time = (ros::WallTime::now() - start).toSec() * 1000.0;
     ROS_INFO("Lidar callback time: %.2f ms (at least %.2f FPS)", time, (1000.0 / time));

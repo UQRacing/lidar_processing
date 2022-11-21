@@ -19,7 +19,8 @@ namespace uqr {
  * v1.0.2: fixed image topics not setting the header timestamp
  * v1.0.3: refactored topic names
  * v1.1.0: added uqr_msgs/DepthImage publisher
+ * v1.2.0: removed inpainting, as this is no longer necessary
  */
-#define LIDAR_PROCESSING_VERSION "1.1.0"
+#define LIDAR_PROCESSING_VERSION "1.2.0"
 
 }

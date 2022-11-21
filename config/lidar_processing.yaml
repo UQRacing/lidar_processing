@@ -24,14 +24,8 @@ lidar_processing:
   ########## PIPELINE SETTINGS ##########
   # Enable morphological operations. Basically increases pixel size (makes it more chunky). Fast.
   morphological: true
-  # Enable inpainting. Fills in missing details in the depth image. Very slow if used on whole frame.
-  inpainting: false
   # If true, publish a colour image (not useful for depth lookups, but good for debug/showing off).
-  publishColour: true
-  # If true, only inpaint inside detected cone bounding boxes from conenet_ros. Otherwise, the whole
-  # image is inpainted.
-  # TODO implement this
-  inpaintDetectionsOnly: true
+  publishColour: false
 
   # Morphological operator kernel size (TODO implement this)
   morphKernelSize: 16

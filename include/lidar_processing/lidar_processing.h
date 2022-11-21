@@ -28,7 +28,6 @@ namespace uqr {
     private:
         ros::Subscriber lidarSub, cameraInfoSub, cameraFrameSub;
         ros::Publisher lidarDepthImgPub, lidarDepthPub;
-        std::optional<ros::Publisher> inpaintingDebugPub;
 
         // YAML parameters
         std::string lidarTopicName{};
@@ -43,7 +42,7 @@ namespace uqr {
         cv::Matx33d intrinsic;
 
         // pipeline configuration
-        bool inpainting = false, morphological = false, publishColour = false;
+        bool morphological = false, publishColour = false;
 
         ddynamic_reconfigure::DDynamicReconfigure ddr{};
 
