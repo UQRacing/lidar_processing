@@ -18,22 +18,19 @@ else()
     add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
-    roscpp
-    rospy
-    std_msgs
-    uqr_msgs
-    fssim_messages
-    geometry_msgs
-    sensor_msgs
-    visualization_msgs
-    ddynamic_reconfigure
-    cv_bridge
-    image_geometry
-)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(example_interfaces REQUIRED)
+find_package(uqr_msgs REQUIRED)
+#find_package(fssim_messages REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+#find_package(ddynamic_reconfigure REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(image_geometry REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
@@ -50,13 +47,6 @@ find_package(OpenMP REQUIRED)
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
-#  INCLUDE_DIRS ${OMPL_INCLUDE_DIRS} ${GEOS_INCLUDE_DIRS}
-#  LIBRARIES lidar_cone_detection
-  CATKIN_DEPENDS roscpp rospy std_msgs uqr_msgs fssim_messages geometry_msgs sensor_msgs
-    visualization_msgs ddynamic_reconfigure cv_bridge image_geometry
-#  DEPENDS
-)
 
 ###########
 ## Build ##
@@ -64,9 +54,9 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(
+ament_export_include_directories(
     include
-    ${catkin_INCLUDE_DIRS}
+    ${rclcpp_INCLUDE_DIRS}
     ${Eigen3_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIR}
     ${OpenCV_INCLUDE_DIRS}
@@ -83,9 +73,15 @@ add_executable(lidar_processing src/lidar_processing.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(lidar_processing
-    ${catkin_LIBRARIES}
+    ${rclcpp_LIBRARIES}
     Eigen3::Eigen
     ${Boost_LIBRARY_DIR}
     ${OpenCV_LIBS}
     OpenMP::OpenMP_CXX
 )
+
+#Removed fssim_messages and ddynamic_reconfigure from dependencies list because I don't have them so I can test whether this will build - you can add it back if it's needed and works in ros2
+ament_export_dependencies(roscpp rospy std_msgs uqr_msgs geometry_msgs sensor_msgs
+    visualization_msgs cv_bridge image_geometry)
+    
+ament_package()
